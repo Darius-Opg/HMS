@@ -1,0 +1,12 @@
+#node modules
+node_modules
+
+
+#environment variables
+.env
+.env.*
+.env.example
+/src/generated/prisma
+/.agents/
+/.claude/
+/.windsurf/

@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "Permission" AS ENUM ('MANAGE_ROOMS', 'MANAGE_RESERVATIONS', 'MANAGE_GUESTS', 'MANAGE_BILLING', 'VIEW_REPORTS', 'MANAGE_USERS', 'VIEW_AUDIT_LOG');
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "permissions" "Permission"[];

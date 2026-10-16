@@ -1,0 +1,415 @@
+@import "tailwindcss";
+
+@layer components {
+    .app-page {
+        min-width: 0;
+        min-height: 100vh;
+        width: 100%;
+        background-color: #F9F6F2;
+    }
+
+    .app-card {
+        border: 1px solid rgb(171 120 77 / 30%);
+        border-radius: 0.5rem;
+        background-color: rgb(255 255 255 / 80%);
+        box-shadow: 0 0 24px rgb(212 175 122 / 30%);
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+    }
+
+    .app-card-raised {
+        box-shadow: 0 0 24px rgb(212 175 122 / 20%);
+    }
+
+    .app-accent-label {
+        color: #AB784D;
+        font-size: 0.75rem;
+        font-weight: 500;
+        letter-spacing: 0.025em;
+        line-height: 1rem;
+        text-transform: uppercase;
+    }
+
+    .app-accent-title {
+        color: #f39513;
+        font-size: 1.875rem;
+        font-weight: 600;
+        line-height: 2.25rem;
+        text-align: center;
+    }
+
+    .app-accent-text {
+        color: #AB784D;
+    }
+
+    .app-muted-text {
+        color: #4B5563;
+    }
+
+    .app-button {
+        border: 1px solid rgb(171 120 77 / 60%);
+        border-radius: 0.25rem;
+        padding: 0.375rem 0.75rem;
+        color: #80552F;
+        font-size: 0.875rem;
+        font-weight: 500;
+        line-height: 1.25rem;
+        transition: background-color 150ms ease-in-out;
+    }
+
+    .app-button:hover:not(:disabled) {
+        background-color: rgb(243 213 163 / 30%);
+    }
+
+    .app-button:focus-visible,
+    .app-button-primary:focus-visible {
+        outline: 2px solid transparent;
+        box-shadow: 0 0 0 2px #D4AF7A;
+    }
+
+    .app-button-primary {
+        border: 0;
+        border-radius: 0.25rem;
+        padding: 0.375rem 0.75rem;
+        background-color: #F3D5A3;
+        color: #1E1E1E;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.25rem;
+        box-shadow: 0 0 16px rgb(212 175 122 / 25%);
+        transition: background-color 150ms ease-in-out;
+    }
+
+    .app-button-primary:hover:not(:disabled) {
+        background-color: #D4AF7A;
+    }
+
+    .app-button-primary:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .app-input {
+        border: 1px solid rgb(171 120 77 / 50%);
+        border-radius: 0.25rem;
+        padding: 0.5rem 0.75rem;
+        color: #111827;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+
+    .app-input:focus {
+        outline: 2px solid transparent;
+        box-shadow: 0 0 0 2px #D4AF7A;
+    }
+
+    .app-chip {
+        border-radius: 0.25rem;
+        padding: 0.125rem 0.5rem;
+        background-color: rgb(243 213 163 / 35%);
+        color: #80552F;
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+
+    .app-error {
+        border: 1px solid #FECACA;
+        border-radius: 0.25rem;
+        padding: 0.5rem 0.75rem;
+        background-color: #FEF2F2;
+        color: #B91C1C;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+
+    .app-modal-overlay {
+        position: fixed;
+        z-index: 30;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background-color: rgb(0 0 0 / 50%);
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+    }
+
+    .app-modal {
+        width: 100%;
+        border: 1px solid rgb(171 120 77 / 30%);
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        background-color: rgb(255 255 255 / 95%);
+        box-shadow: 0 0 24px rgb(212 175 122 / 30%);
+    }
+
+    .app-header {
+        position: fixed;
+        z-index: 50;
+        inset: 0 0 auto;
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.625rem 0.75rem;
+        background-color: rgb(249 246 242 / 30%);
+        box-shadow: 0 0 24px rgb(212 175 122 / 30%);
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+    }
+
+    .app-sidebar {
+        position: fixed;
+        z-index: 10;
+        top: 4rem;
+        bottom: 0;
+        left: 0;
+        display: none;
+        width: 14rem;
+        overflow-y: auto;
+        padding: 1.5rem 1rem;
+        border-right: 1px solid rgb(171 120 77 / 25%);
+        background-color: rgb(249 246 242 / 95%);
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+    }
+
+    .app-sidebar-role {
+        margin: 0 0 1rem;
+        padding: 0 0.75rem;
+        color: #AB784D;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .app-sidebar-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .app-sidebar-link {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        border-radius: 0.375rem;
+        padding: 0.625rem 0.75rem;
+        color: #80552F;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: background-color 150ms ease-in-out, color 150ms ease-in-out;
+    }
+
+    .app-sidebar-link:hover,
+    .app-sidebar-link-active {
+        background-color: rgb(243 213 163 / 40%);
+        color: #5C3B21;
+    }
+
+    .app-sidebar-link:focus-visible {
+        outline: 2px solid #D4AF7A;
+        outline-offset: 2px;
+    }
+
+    .app-page.dark,
+    .dark .app-page {
+        background-color: #0A0A0A;
+    }
+
+    .app-card.dark,
+    .dark .app-card {
+        border-color: rgb(179 138 94 / 30%);
+        background-color: rgb(30 30 30 / 80%);
+    }
+
+    .dark .app-accent-label,
+    .app-accent-label.dark,
+    .dark .app-accent-text,
+    .app-accent-text.dark {
+        color: #B38A5E;
+    }
+
+    .dark .app-accent-title,
+    .app-accent-title.dark {
+        color: #FFFFFF;
+    }
+
+    .dark .app-muted-text,
+    .app-muted-text.dark {
+        color: #D1D5DB;
+    }
+
+    .dark .app-button,
+    .app-button.dark {
+        border-color: rgb(179 138 94 / 60%);
+        color: #F3D5A3;
+    }
+
+    .dark .app-button:hover:not(:disabled),
+    .app-button.dark:hover:not(:disabled) {
+        background-color: rgb(212 175 122 / 15%);
+    }
+
+    .dark .app-button-primary:focus-visible,
+    .app-button-primary.dark:focus-visible {
+        box-shadow: 0 0 0 2px #D4AF7A, 0 0 0 4px #1E1E1E;
+    }
+
+    .dark .app-input,
+    .app-input.dark {
+        border-color: rgb(179 138 94 / 60%);
+        background-color: #1E1E1E;
+        color: #FFFFFF;
+    }
+
+    .dark .app-chip,
+    .app-chip.dark {
+        background-color: rgb(212 175 122 / 20%);
+        color: #F3D5A3;
+    }
+
+    .dark .app-modal,
+    .app-modal.dark {
+        border-color: rgb(179 138 94 / 30%);
+        background-color: rgb(30 30 30 / 95%);
+    }
+
+    .dark .app-header,
+    .app-header.dark {
+        background-color: rgb(10 10 10 / 30%);
+    }
+
+    .dark .app-sidebar,
+    .app-sidebar.dark {
+        border-color: rgb(179 138 94 / 25%);
+        background-color: rgb(10 10 10 / 95%);
+    }
+
+    .dark .app-sidebar-role,
+    .app-sidebar-role.dark {
+        color: #B38A5E;
+    }
+
+    .dark .app-sidebar-link,
+    .app-sidebar-link.dark {
+        color: #F3D5A3;
+    }
+
+    .dark .app-sidebar-link:hover,
+    .dark .app-sidebar-link-active,
+    .app-sidebar-link.dark:hover,
+    .app-sidebar-link-active.dark {
+        background-color: rgb(212 175 122 / 20%);
+        color: #FFFFFF;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .app-page {
+        background-color: #0A0A0A;
+    }
+
+    .app-card {
+        border-color: rgb(179 138 94 / 30%);
+        background-color: rgb(30 30 30 / 80%);
+    }
+
+    .app-accent-label,
+    .app-accent-text {
+        color: #B38A5E;
+    }
+
+    .app-accent-title {
+        color: #FFFFFF;
+    }
+
+    .app-muted-text {
+        color: #D1D5DB;
+    }
+
+    .app-button {
+        border-color: rgb(179 138 94 / 60%);
+        color: #F3D5A3;
+    }
+
+    .app-button:hover:not(:disabled) {
+        background-color: rgb(212 175 122 / 15%);
+    }
+
+    .app-button-primary:focus-visible {
+        box-shadow: 0 0 0 2px #D4AF7A, 0 0 0 4px #1E1E1E;
+    }
+
+    .app-input {
+        border-color: rgb(179 138 94 / 60%);
+        background-color: #1E1E1E;
+        color: #FFFFFF;
+    }
+
+    .app-chip {
+        background-color: rgb(212 175 122 / 20%);
+        color: #F3D5A3;
+    }
+
+    .app-modal {
+        border-color: rgb(179 138 94 / 30%);
+        background-color: rgb(30 30 30 / 95%);
+    }
+
+    .app-header {
+        background-color: rgb(10 10 10 / 30%);
+    }
+
+    .app-sidebar {
+        border-color: rgb(179 138 94 / 25%);
+        background-color: rgb(10 10 10 / 95%);
+    }
+
+    .app-sidebar-role {
+        color: #B38A5E;
+    }
+
+    .app-sidebar-link {
+        color: #F3D5A3;
+    }
+
+    .app-sidebar-link:hover,
+    .app-sidebar-link-active {
+        background-color: rgb(212 175 122 / 20%);
+        color: #FFFFFF;
+    }
+}
+
+@media (min-width: 640px) {
+    .app-header {
+        padding-right: 1.25rem;
+        padding-left: 1.25rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .app-header {
+        padding-right: 1.5rem;
+        padding-left: 1.5rem;
+    }
+}
+
+@media (min-width: 640px) {
+    .app-sidebar {
+        display: block;
+    }
+}
+
+@media (min-width: 640px) {
+    .app-content-with-sidebar {
+        padding-left: 16rem;
+    }
+}

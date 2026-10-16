@@ -1,0 +1,210 @@
+
+//==================================================================================
+//Hotel Management System - Trace Lounge Hotel
+//==================================================================================
+
+generator client{
+    provider     ="prisma-client-js"
+    output       = "../src/generated/prisma"
+    moduleFormat = "esm"
+}
+
+datasource db{
+    provider="postgresql"
+}
+
+//===============================================================
+// Enums to lock specific fields down to specific datasource
+//===============================================================
+
+enum Role {
+    ADMIN
+    STAFF
+}
+
+enum RoomStatus {
+    AVAILABLE
+    OCCUPIED
+    MAINTENANCE
+    RESERVED
+}
+
+enum ReservationStatus {
+    BOOKED
+    CHECKED_IN
+    CHECKED_OUT
+    CANCELLED
+}
+
+enum PaymentStatus {
+    PENDING
+    PARTIAL
+    PAID
+}
+
+enum GuestTier {
+  STANDARD
+  PREMIUM
+}
+
+enum Permission {
+    MANAGE_ROOMS
+    MANAGE_RESERVATIONS
+    MANAGE_GUESTS
+    MANAGE_BILLING
+    VIEW_REPORTS
+    MANAGE_USERS
+    VIEW_AUDIT_LOG
+}
+
+
+model User{
+    id          String  @id @default(uuid()) @db.Uuid
+    name        String 
+    email       String  @unique
+    password    String
+    role        Role    @default(STAFF)
+
+    phoneEncrypted      String 
+    phoneHash           String
+    idNumberEncrypted   String
+    idNumberHash        String
+
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    isActive           Boolean   @default(true)
+    deactivatedAt      DateTime?
+    deactivationReason String?   @db.Text
+
+    isDelete        Boolean   @default(false)
+    deletedAt       DateTime?
+    deletionReason  String?   @db.Text
+
+    reservationsCreated     Reservation[]  @relation("ReservationCreatedBy")
+    auditLogs               AuditLog[]
+    permissions             Permission[]
+    refreshTokens           RefreshToken[]
+
+    @@index([phoneHash])
+}
+
+model Room {
+  id         String     @id @default(uuid()) @db.Uuid
+  roomNumber String     @unique
+  floor      Int?
+  status     RoomStatus @default(AVAILABLE)
+  color      String? 
+  roomColor  String?
+  features   Json? 
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  roomTypeId String   @db.Uuid
+  roomType   RoomType        @relation(fields: [roomTypeId], references: [id])
+
+  reservations Reservation[]
+}
+
+model RoomType {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique 
+  description String?
+  basePrice   Decimal  @db.Decimal(10, 2)
+  capacity    Int 
+  sizeSqm     Decimal? @db.Decimal(6, 2) 
+  features    String[] 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rooms Room[]
+}
+
+model Guest {
+    id          String      @id @default(uuid()) @db.Uuid
+    firstName   String
+    lastName    String
+    email       String?     @unique
+
+    //phone number and id number are stored as 
+    //encrypted text and hashed text so that hash 
+    //can be used for searches
+
+    phoneEncrypted      String?      
+    phoneHash           String?      @unique
+    idNumberEncrypted   String?     @unique
+    idNumberHash        String?     @unique
+    loyaltyTier         GuestTier   @default(STANDARD)
+
+    createdAt       DateTime        @default(now())
+    updatedAt       DateTime        @updatedAt
+
+    reservations    Reservation[]
+
+    @@index([phoneHash])
+    @@index([idNumberHash])
+}
+
+model Reservation {
+    id              String                  @id @default(uuid()) @db.Uuid
+    checkInDate     DateTime
+    checkOutDate    DateTime
+    actualCheckIn   DateTime?
+    actualCheckOut  DateTime?
+    status          ReservationStatus       @default(BOOKED)
+    rateAtBooking   Decimal                 @db.Decimal(10, 2)
+    createdAt       DateTime                @default(now())
+    updatedAt       DateTime                @updatedAt
+
+    guestId         String         @db.Uuid
+    guest           Guest          @relation(fields:[guestId],references:[id])
+
+    roomId          String         @db.Uuid
+    room            Room           @relation(fields:[roomId],references:[id])
+
+    createdById     String         @db.Uuid
+    createdBy       User           @relation("ReservationCreatedBy",fields:[createdById],references:[id])
+
+    invoice         Invoice?
+}
+
+model Invoice {
+    id              String          @id @default(uuid()) @db.Uuid
+    totalAmount     Decimal         @db.Decimal(10, 2)
+    extraCharges    Decimal         @db.Decimal(10, 2) @default(0)
+    paymentStatus   PaymentStatus   @default(PENDING)
+    paidAt          DateTime?
+    createdAt       DateTime        @default(now())
+    updatedAt       DateTime        @updatedAt
+
+    reservationId   String          @unique @db.Uuid
+    reservation     Reservation     @relation(fields:[reservationId],references:[id])
+}
+
+model AuditLog {
+  id         String  @id @default(uuid()) @db.Uuid
+  action     String  
+  entityType String? 
+  entityId   String? @db.Uuid
+  metadata   Json?      
+
+  performedById String? @db.Uuid 
+  performedBy   User?   @relation(fields: [performedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  tokenHash String    @unique
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
