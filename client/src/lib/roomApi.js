@@ -20,4 +20,24 @@ export async function listRooms({ roomTypeId } = {}) {
     return res.json();
 }
 
+export async function reserveRoom({ roomNumber,
+    firstName, lastName, phoneNumber,
+    idNumber, email, checkInDate,
+    period, periodUnit, paidAmount, }) {
+    const response = await send(`/guests/reserve`, {
+        method: 'POST',
+        body: JSON.stringify({
+            roomNumber,
+            firstName, lastName, phoneNumber,
+            idNumber, email, checkInDate,
+            period, periodUnit, paidAmount,
+        }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.error || "Failed to reserve room");
+    }
+    return data;
+}
 

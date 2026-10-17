@@ -21,7 +21,7 @@ export function sendError(res, error) {
     return res.status(500).json({ error: 'Internal server error' });
 }
 
-const handle = (fn) => async (req, res) => {
+export const handle = (fn) => async (req, res) => {
     try {
         await fn(req, res);
     } catch (error) {

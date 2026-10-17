@@ -1,10 +1,24 @@
 import { useState } from "react";
 import Button from "./Button";
+import { reserveRoom } from "../lib/roomApi";
+import { calculateTotalFees } from "../lib/rates";
 
-export default function RoomAllocationModal({ room, onCancel }) {
+export default function RoomAllocationModal({ room, hourlyRate, onCancel }) {
+    const [submissionError, setSubmissionError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    async function onSubmitAllocation() {
-        //this function will handle room allocation api 
+    async function onSubmitAllocation(allocation) {
+        setSubmissionError("");
+        setIsSubmitting(true);
+
+        try {
+            await reserveRoom(allocation);
+            onCancel();
+        } catch (error) {
+            setSubmissionError(error instanceof Error ? error.message : "Failed to reserve room");
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
     return (
@@ -19,9 +33,16 @@ export default function RoomAllocationModal({ room, onCancel }) {
                 aria-labelledby="allocate-room-title"
             >
                 <RoomReservationForm
-                    onsubmit={onSubmitAllocation}
+                    onSubmit={onSubmitAllocation}
                     room={room}
+                    hourlyRate={hourlyRate}
                 />
+
+                {submissionError && (
+                    <p role="alert" className="mt-4 text-sm text-red-700 dark:text-red-300">
+                        {submissionError}
+                    </p>
+                )}
 
                 <div className="mt-6 flex justify-end gap-2">
                     <Button
@@ -29,11 +50,14 @@ export default function RoomAllocationModal({ room, onCancel }) {
                         onClick={onCancel}
                     />
 
-                    <Button
-                        text="Confirm"
-                        onClick={onSubmitAllocation}
-                        className="border-[#AB784D] bg-[#F3D5A3] font-semibold text-[#1E1E1E] hover:bg-[#D4AF7A] dark:border-[#B38A5E] dark:bg-[#D4AF7A] dark:text-[#1E1E1E] dark:hover:bg-[#F3D5A3]"
-                    />
+                    <button
+                        type="submit"
+                        form="room-reservation-form"
+                        disabled={isSubmitting}
+                        className="app-button border-[#AB784D] bg-[#F3D5A3] font-semibold text-[#1E1E1E] hover:bg-[#D4AF7A] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#B38A5E] dark:bg-[#D4AF7A] dark:text-[#1E1E1E] dark:hover:bg-[#F3D5A3]"
+                    >
+                        {isSubmitting ? "Confirming..." : "Confirm"}
+                    </button>
                 </div>
             </div>
         </div>
@@ -41,10 +65,37 @@ export default function RoomAllocationModal({ room, onCancel }) {
 }
 
 
-function RoomReservationForm({ onsubmit, room }) {
+function RoomReservationForm({ onSubmit, room, hourlyRate }) {
     const [isPartialPayment, setIsPartialPayment] = useState(false);
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [idNumber, setIdNumber] = useState("");
+    const [phoneNumber, setPhoneNumber] = useState("");
+    const [email, setEmail] = useState("");
+    const [checkInDate, setCheckInDate] = useState("");
+    const [period, setPeriod] = useState("1");
+    const [periodUnit, setPeriodUnit] = useState("hours");
+    const [partialPaymentAmount, setPartialPaymentAmount] = useState("");
+    const totalFees = calculateTotalFees(hourlyRate, period, periodUnit);
+
+    function handleSubmit(event) {
+        event.preventDefault();
+        onSubmit({
+            roomNumber: room,
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            idNumber: idNumber.trim(),
+            phoneNumber: phoneNumber.trim(),
+            email: email.trim() || undefined,
+            checkInDate,
+            period: Number(period),
+            periodUnit,
+            paidAmount: isPartialPayment ? Number(partialPaymentAmount) : undefined,
+        });
+    }
+
     return (
-        <form onSubmit={onsubmit} className="mt-4 ">
+        <form id="room-reservation-form" onSubmit={handleSubmit} className="mt-4 ">
             <h1 className="app-accent-title">Room Reservation Form</h1>
             <p className="app-accent-title text-sm">
                 Reservation for room {room}
@@ -52,40 +103,40 @@ function RoomReservationForm({ onsubmit, room }) {
             <fieldset className="flex flex-row gap-4 w-full min-w-0 mt-6">
                 <fieldset className="flex flex-col gap-1 w-full min-w-0">
                     <legend className="app-accent-label ">Guest First Name</legend>
-                    <input type="text" className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" placeholder="Guest first name" />
+                    <input type="text" name="firstName" value={firstName} onChange={(event) => setFirstName(event.target.value)} required className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" placeholder="Guest first name" />
                 </fieldset>
                 <fieldset className="flex flex-col gap-1 w-full min-w-0">
                     <legend className="app-accent-label ">Guest Last Name</legend>
-                    <input type="text" className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" placeholder="Guest last name" />
+                    <input type="text" name="lastName" value={lastName} onChange={(event) => setLastName(event.target.value)} required className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" placeholder="Guest last name" />
                 </fieldset>
             </fieldset>
             <fieldset className="flex flex-row gap-4 w-full min-w-0 mt-8">
                 <fieldset className="flex flex-col gap-1 w-full min-w-0">
                     <legend className="app-accent-label">ID Number / Passport</legend>
-                    <input type="text" className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white " placeholder="Passport or ID Number" />
+                    <input type="text" name="idNumber" value={idNumber} onChange={(event) => setIdNumber(event.target.value)} required className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white " placeholder="Passport or ID Number" />
                 </fieldset>
                 <fieldset className="flex flex-col gap-1 w-full min-w-0">
                     <legend className="app-accent-label">Phone Number</legend>
-                    <input type="tel" className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" placeholder="Phone number" />
+                    <input type="tel" name="phoneNumber" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} required className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" placeholder="Phone number" />
                 </fieldset>
             </fieldset>
             <fieldset className="flex flex-col gap-1 w-full min-w-0 mt-8">
                 <legend className="app-accent-label">Email (optional)</legend>
-                <input type="email" className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" placeholder="Email address" />
+                <input type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" placeholder="Email address" />
             </fieldset>
             <fieldset className="flex flex-row gap-4 w-full min-w-0 mt-8">
                 <fieldset className="flex flex-col gap-1 w-full min-w-0">
                     <legend className="app-accent-label">Check-in Date and Time</legend>
-                    <input type="datetime-local" className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" />
+                    <input type="datetime-local" name="checkInDate" value={checkInDate} onChange={(event) => setCheckInDate(event.target.value)} required className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" />
                 </fieldset>
                 <fieldset className="flex flex-row gap-4 w-full min-w-0">
                     <fieldset className="flex flex-col gap-1 w-full min-w-0">
                         <legend className="app-accent-label">Period </legend>
-                        <input type="number" inputMode="numerical" className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" />
+                        <input type="number" name="period" min="1" step="1" inputMode="numeric" value={period} onChange={(event) => setPeriod(event.target.value)} required className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" />
                     </fieldset>
                     <fieldset className="flex flex-col gap-1 w-full min-w-0">
                         <legend className="app-accent-label">Period </legend>
-                        <select className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white">
+                        <select name="periodUnit" value={periodUnit} onChange={(event) => setPeriodUnit(event.target.value)} className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white">
                             <option value="hours">Hours</option>
                             <option value="days">Days</option>
                             <option value="weeks">Weeks</option>
@@ -138,6 +189,8 @@ function RoomReservationForm({ onsubmit, room }) {
                             min="0.01"
                             step="0.01"
                             name="partialPaymentAmount"
+                            value={partialPaymentAmount}
+                            onChange={(event) => setPartialPaymentAmount(event.target.value)}
                             className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white"
                             placeholder="Enter partial paid amount"
                             required
@@ -149,7 +202,14 @@ function RoomReservationForm({ onsubmit, room }) {
 
             <fieldset className="flex flex-col gap-1 w-full min-w-0 mt-8">
                 <legend className="app-accent-label">Total fees</legend>
-                <input readOnly className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white" placeholder="Total fees" />
+                <input
+                    type="text"
+                    name="totalFees"
+                    value={totalFees === null ? "0.00" : totalFees.toFixed(2)}
+                    readOnly
+                    className="app-input h-10 w-full rounded-md bg-[#dbdad9] pl-3 text-black outline-none dark:bg-slate-600 dark:text-white"
+                    placeholder="Rate unavailable"
+                />
             </fieldset>
         </form>
     )

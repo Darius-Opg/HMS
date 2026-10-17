@@ -241,6 +241,7 @@ export default function Room() {
             {selectedRoom && (
                 <RoomAllocationModal
                     room={selectedRoom.roomNumber}
+                    hourlyRate={selectedRoom.roomType?.basePrice ?? fallbackBasePrice}
                     onCancel={() => setSelectedRoom(null)}
                 />
             )}
