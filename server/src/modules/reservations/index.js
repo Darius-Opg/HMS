@@ -45,7 +45,13 @@ router.get('/', handle(async (req, res) => {
         const extraTimeStayedMinutes = isActive && checkOutTime < now
             ? Math.floor((now - checkOutTime) / 60_000)
             : 0;
+        const extraTimeCharge = extraTimeStayedMinutes > 60
+            ? Math.round((Number(reservation.rateAtBooking) * extraTimeStayedMinutes / 60) * 100) / 100
+            : 0;
+        const invoiceTotal = Number(reservation.invoice?.totalAmount ?? 0);
+        const amountPaid = Number(reservation.invoice?.amountPaid ?? 0);
+        const balance = Math.max(invoiceTotal - amountPaid, 0) + extraTimeCharge;
 
-        return { ...reservation, extraTimeStayedMinutes };
+        return { ...reservation, extraTimeStayedMinutes, extraTimeCharge, balance };
     }));
 }));

@@ -3,20 +3,17 @@ import { useNavigate } from "react-router-dom";
 import GuestReservationCard from "../components/ReservedCard";
 import ReservationToolBar from "../components/ReservationToolBar";
 import { getReservations } from "../lib/reservationApi";
+import ReservationModal, { CheckOutCard, UpdateStayForm } from "../components/ReservationUpdateModal";
 
 function getGuestName(guest) {
     return [guest?.firstName, guest?.lastName].filter(Boolean).join(" ");
 }
 
-function getBalance(invoice) {
-    const total = Number(invoice?.totalAmount ?? 0);
-    const amountPaid = Number(invoice?.amountPaid ?? 0);
-    return Math.max(total - amountPaid, 0);
-}
-
 export default function ReservationsPage() {
     const navigate = useNavigate();
     const [reservations, setReservations] = useState([]);
+    const [reservationToUpdate, setReservationToUpdate] = useState(null);
+    const [checkOutUpdate, setCheckOutUpdate] = useState(null);
     const [filters, setFilters] = useState({
         roomName: "",
         paymentStatus: "",
@@ -57,8 +54,8 @@ export default function ReservationsPage() {
 
     const filteredReservations = useMemo(() => reservations.filter((reservation) => (
         (!filters.roomName || reservation.room?.roomType?.name === filters.roomName)
-            && (!filters.paymentStatus || reservation.invoice?.paymentStatus === filters.paymentStatus)
-            && (!filters.checkOutStatus || reservation.status === filters.checkOutStatus)
+        && (!filters.paymentStatus || reservation.invoice?.paymentStatus === filters.paymentStatus)
+        && (!filters.checkOutStatus || reservation.status === filters.checkOutStatus)
     )), [reservations, filters]);
 
     return (
@@ -114,8 +111,10 @@ export default function ReservationsPage() {
                                         && Boolean(reservation.checkOutDate)
                                         && new Date(reservation.checkOutDate) < new Date()
                                     }
-                                    balance={getBalance(reservation.invoice)}
+                                    balance={reservation.balance}
                                     checkOutDate={reservation.checkOutDate}
+                                    onUpdate={() => setReservationToUpdate(reservation)}
+                                    onCheckOut={() => setCheckOutUpdate(reservation)}
                                     extraTimeStayedMinutes={reservation.extraTimeStayedMinutes}
                                 />
                             ))}
@@ -123,6 +122,28 @@ export default function ReservationsPage() {
                     </section>
                 )}
             </div>
+            {reservationToUpdate && (
+                <ReservationModal
+                    onClose={() => setReservationToUpdate(null)}
+                    title={`Update reservation for room ${reservationToUpdate.room?.roomNumber ?? ""}`}
+                >
+                    <UpdateStayForm
+                        reservation={reservationToUpdate}
+                        onClose={() => setReservationToUpdate(null)}
+                    />
+                </ReservationModal>
+            )}
+            {checkOutUpdate && (
+                <ReservationModal
+                    onClose={() => setCheckOutUpdate(null)}
+                    title={`Checking out room ${checkOutUpdate.room?.roomNumber ?? ""}`}
+                >
+                    <CheckOutCard
+                        onClose={() => setCheckOutUpdate(null)}
+                        reservation={checkOutUpdate}
+                    />
+                </ReservationModal>
+            )}
         </main>
     );
 }

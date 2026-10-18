@@ -77,6 +77,7 @@ function RoomReservationForm({ onSubmit, room, hourlyRate }) {
     const [periodUnit, setPeriodUnit] = useState("hours");
     const [partialPaymentAmount, setPartialPaymentAmount] = useState("");
     const totalFees = calculateTotalFees(hourlyRate, period, periodUnit);
+   
 
     function handleSubmit(event) {
         event.preventDefault();
@@ -146,7 +147,6 @@ function RoomReservationForm({ onSubmit, room, hourlyRate }) {
                 </fieldset>
             </fieldset>
 
-
             <fieldset className="mt-8 flex w-full min-w-0 flex-col gap-3">
                 <legend className="app-accent-label mb-2">
                     Payment Type
@@ -198,8 +198,6 @@ function RoomReservationForm({ onSubmit, room, hourlyRate }) {
                     </fieldset>
                 )}
             </fieldset>
-
-
             <fieldset className="flex flex-col gap-1 w-full min-w-0 mt-8">
                 <legend className="app-accent-label">Total fees</legend>
                 <input
