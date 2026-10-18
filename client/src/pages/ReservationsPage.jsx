@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import GuestReservationCard from "../components/ReservedCard";
 import ReservationToolBar from "../components/ReservationToolBar";
-import { getReservations } from "../lib/reservationApi";
+import {
+    adjustReservationDetails,
+    confirmCheckOut,
+    getReservations,
+} from "../lib/reservationApi";
 import ReservationModal, { CheckOutCard, UpdateStayForm } from "../components/ReservationUpdateModal";
 
 function getGuestName(guest) {
@@ -21,6 +25,12 @@ export default function ReservationsPage() {
     });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
+
+    async function reloadReservations() {
+        const data = await getReservations();
+        setReservations(data);
+        setError("");
+    }
 
     useEffect(() => {
         let cancelled = false;
@@ -45,6 +55,31 @@ export default function ReservationsPage() {
             cancelled = true;
         };
     }, []);
+
+    async function handleUpdateStay({ reservationId, checkOutTime, paymentType, paidAmount }) {
+        await adjustReservationDetails({
+            reservationId,
+            checkOutTime: new Date(checkOutTime).toISOString(),
+            paymentType,
+            paidAmount,
+        });
+        setReservationToUpdate(null);
+        try {
+            await reloadReservations();
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : "Failed to refresh reservations");
+        }
+    }
+
+    async function handleCheckOut(reservation) {
+        await confirmCheckOut({ reservationId: reservation.id });
+        setCheckOutUpdate(null);
+        try {
+            await reloadReservations();
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : "Failed to refresh reservations");
+        }
+    }
 
     const rooms = useMemo(() => (
         [...new Set(reservations.map(({ room }) => room?.roomType?.name).filter(Boolean))]
@@ -130,6 +165,7 @@ export default function ReservationsPage() {
                     <UpdateStayForm
                         reservation={reservationToUpdate}
                         onClose={() => setReservationToUpdate(null)}
+                        onSubmit={handleUpdateStay}
                     />
                 </ReservationModal>
             )}
@@ -141,6 +177,7 @@ export default function ReservationsPage() {
                     <CheckOutCard
                         onClose={() => setCheckOutUpdate(null)}
                         reservation={checkOutUpdate}
+                        onSubmit={handleCheckOut}
                     />
                 </ReservationModal>
             )}

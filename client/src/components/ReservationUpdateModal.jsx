@@ -13,11 +13,11 @@ export default function ReservationModal({ onClose, children, title = "Reservati
 
     return (
         <div
-            className="app-modal-overlay fixed inset-0 z-30 flex items-start justify-center overflow-y-auto p-3 sm:p-6"
+            className="app-modal-overlay fixed inset-0 z-30 flex items-start justify-center overflow-y-auto scrollbar-none p-3 sm:p-6"
 
         >
             <div
-                className="app-modal relative my-auto mt-8 w-full max-w-2xl max-h-[calc(100dvh-3.5rem)] overflow-y-auto overscroll-contain p-5 sm:mt-10 sm:max-h-[calc(100dvh-4rem)] sm:p-8"
+                className="app-modal relative my-auto mt-8 w-full max-w-2xl max-h-[calc(100dvh-3.5rem)] overflow-y-auto overscroll-contain scrollbar-none p-5 sm:mt-10 sm:max-h-[calc(100dvh-4rem)] sm:p-8"
                 role="dialog"
                 aria-modal="true"
                 aria-label={title}
@@ -49,6 +49,8 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
     const [isPartialPayment, setIsPartialPayment] = useState(false);
     const [partialPaymentAmount, setPartialPaymentAmount] = useState("");
     const [checkOutTime, setCheckOutTime] = useState(() => toLocalDateTimeValue(reservation?.checkOutDate));
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submissionError, setSubmissionError] = useState("");
     const roomNumber = reservation?.room?.roomNumber;
     const guestName = [reservation?.guest?.firstName, reservation?.guest?.lastName]
         .filter(Boolean)
@@ -59,15 +61,23 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
         minimumFractionDigits: 2,
     }).format(Number(reservation?.balance ?? 0));
 
-    function handleSubmit(event) {
+    async function handleSubmit(event) {
         event.preventDefault();
-        if (onSubmit) {
-            onSubmit({
+        if (!onSubmit) return;
+
+        setIsSubmitting(true);
+        setSubmissionError("");
+        try {
+            await onSubmit({
                 reservationId: reservation?.id,
                 checkOutTime,
                 paymentType: isPartialPayment ? "PARTIAL" : "FULL",
                 paidAmount: isPartialPayment ? Number(partialPaymentAmount) : undefined,
             });
+        } catch (error) {
+            setSubmissionError(error instanceof Error ? error.message : "Failed to update reservation");
+        } finally {
+            setIsSubmitting(false);
         }
     }
 
@@ -165,12 +175,16 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
                 )}
             </fieldset>
 
+            {submissionError && (
+                <p className="app-error text-sm" role="alert">{submissionError}</p>
+            )}
+
             <div className="flex flex-col-reverse justify-end gap-3 border-t border-[#AB784D]/25 pt-5 sm:flex-row">
                 <button type="button" onClick={onClose} className="app-button">
                     Cancel
                 </button>
-                <button type="submit" className="app-button-primary">
-                    Save changes
+                <button type="submit" disabled={isSubmitting} className="app-button-primary">
+                    {isSubmitting ? "Saving..." : "Save changes"}
                 </button>
             </div>
         </form>
@@ -178,10 +192,26 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
 }
 
 export function CheckOutCard({ onClose, onSubmit, reservation }) {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submissionError, setSubmissionError] = useState("");
     const roomNumber = reservation?.room?.roomNumber;
     const guestName = [reservation?.guest?.firstName, reservation?.guest?.lastName]
         .filter(Boolean)
         .join(" ");
+
+    async function handleCheckOut() {
+        if (!onSubmit) return;
+
+        setIsSubmitting(true);
+        setSubmissionError("");
+        try {
+            await onSubmit(reservation);
+        } catch (error) {
+            setSubmissionError(error instanceof Error ? error.message : "Failed to check out guest");
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -218,16 +248,21 @@ export function CheckOutCard({ onClose, onSubmit, reservation }) {
                 Checking out will end this stay and make the room available for another reservation.
             </p>
 
+            {submissionError && (
+                <p className="app-error text-sm" role="alert">{submissionError}</p>
+            )}
+
             <div className="flex flex-col-reverse justify-end gap-3 border-t border-[#AB784D]/25 pt-5 sm:flex-row">
                 <button type="button" onClick={onClose} className="app-button">
                     Cancel
                 </button>
                 <button
                     type="button"
-                    onClick={() => onSubmit?.(reservation)}
-                    className="app-button-primary"
+                    onClick={handleCheckOut}
+                    disabled={isSubmitting}
+                    className="app-button-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    Confirm checkout
+                    {isSubmitting ? "Checking out..." : "Confirm checkout"}
                 </button>
             </div>
         </div>

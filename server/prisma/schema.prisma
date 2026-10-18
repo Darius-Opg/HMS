@@ -166,6 +166,8 @@ model Reservation {
     createdBy       User           @relation("ReservationCreatedBy",fields:[createdById],references:[id])
 
     invoice         Invoice?
+
+    @@index([status, checkInDate(sort: Desc)])
 }
 
 model Invoice {
