@@ -8,6 +8,7 @@ import RoomPage from './pages/RoomPage';
 import { StaffLayoutWrapper } from './layout/StaffLayout';
 import { AdminLayoutWrapper } from './layout/AdminLayout';
 import ReservationPage from './pages/ReservationsPage';
+import UsersPage from './pages/UsersPage';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/roompage" element={<RoomPage />} />
         <Route path="/reservations" element={<ReservationPage />} />
+        <Route path='/staff' element={<UsersPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

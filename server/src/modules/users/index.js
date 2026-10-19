@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from "bcrypt";
 import prisma from "../database/index.js";
-import { encrypt, hash } from "../security/index.js";
+import { decrypt, encrypt, hash } from "../security/index.js";
 import { requireAuth, requirePermission } from "../auth/access.js";
 
 const SALT_ROUNDS = 12;
@@ -19,6 +19,7 @@ const DEFAULT_PERMISSIONS = {
     STAFF: [
         'MANAGE_RESERVATIONS',
         'MANAGE_GUESTS',
+        'MANAGE_ROOMS'
     ]
 }
 
@@ -60,15 +61,47 @@ export async function findByEmailForAuth(email) {
     }
 }
 
-
 export async function listUsers() {
-    return prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+    const users = await prisma.user.findMany({
+        where: { isDelete: false },
+        orderBy: { createdAt: 'desc' },
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            permissions: true,
+            phoneEncrypted: true,
+            idNumberEncrypted: true,
+            createdAt: true,
+            isActive: true,
+        },
+    });
+
+    return users.map(({ phoneEncrypted, idNumberEncrypted, ...user }) => ({
+        ...user,
+        phone: decrypt(phoneEncrypted),
+        idNumber: decrypt(idNumberEncrypted),
+    }));
 }
 
-export async function updateUser(id, { name, email, role, permissions }) {
+export async function updateUser(id, { name, email, role, permissions, phone, idNumber }) {
     return prisma.user.update({
         where: { id },
-        data: { name, email, role, permissions },
+        data: {
+            name,
+            email,
+            role,
+            permissions: permissions ?? (role ? DEFAULT_PERMISSIONS[role] : undefined),
+            ...(phone !== undefined && {
+                phoneEncrypted: encrypt(phone),
+                phoneHash: hash(phone),
+            }),
+            ...(idNumber !== undefined && {
+                idNumberEncrypted: encrypt(idNumber),
+                idNumberHash: hash(idNumber),
+            }),
+        },
     });
 }
 
@@ -153,9 +186,16 @@ router.get('/:id', async (req, res) => {
 });
 
 router.patch('/:id', async (req, res) => {
-    const { name, email, role, permissions } = req.body;
+    const { name, email, role, permissions, phone, idNumber } = req.body;
     try {
-        const user = await updateUser(req.params.id, { name, email, role, permissions });
+        const user = await updateUser(req.params.id, {
+            name,
+            email,
+            role,
+            permissions,
+            phone,
+            idNumber,
+        });
         res.json(user);
     } catch (err) {
         res.status(400).json({ error: 'Could not update user', detail: err.message });

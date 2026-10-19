@@ -22,7 +22,7 @@ function normalizeOptions(options, getOption) {
     ));
 }
 
-function FilterSelect({ id, filterName, label, icon: Icon, value, onChange, options }) {
+export function FilterSelect({ id, filterName, label, icon: Icon, value, onChange, options }) {
     return (
         <label
             htmlFor={id}

@@ -112,6 +112,87 @@
         line-height: 1rem;
     }
 
+    .app-table-container {
+        overflow-x: auto;
+        border: 1px solid rgb(171 120 77 / 30%);
+        border-radius: 0.5rem;
+        background-color: rgb(255 255 255 / 80%);
+        box-shadow: 0 0 24px rgb(212 175 122 / 20%);
+    }
+
+    .app-table {
+        width: 100%;
+        border-collapse: collapse;
+        color: #1F2937;
+        font-size: 0.875rem;
+        text-align: left;
+    }
+
+    .app-table th,
+    .app-table td {
+        padding: 0.875rem 1rem;
+        vertical-align: middle;
+    }
+
+    .app-table th {
+        background-color: rgb(249 246 242 / 90%);
+        color: #80552F;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .app-table td {
+        border-top: 1px solid rgb(171 120 77 / 15%);
+    }
+
+    .app-table-action {
+        border: 1px solid rgb(171 120 77 / 50%);
+        border-radius: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        color: #80552F;
+        font-size: 0.75rem;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: background-color 150ms ease-in-out;
+    }
+
+    .app-table-action:hover:not(:disabled) {
+        background-color: rgb(243 213 163 / 30%);
+    }
+
+    .app-table-action:focus-visible {
+        outline: 2px solid #D4AF7A;
+        outline-offset: 2px;
+    }
+
+    .app-table-action-danger {
+        border-color: rgb(185 28 28 / 40%);
+        color: #B91C1C;
+    }
+
+    .app-user-status-active,
+    .app-user-status-inactive {
+        display: inline-flex;
+        border-radius: 9999px;
+        padding: 0.125rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .app-user-status-active {
+        background-color: #DCFCE7;
+        color: #166534;
+    }
+
+    .app-user-status-inactive {
+        background-color: #F3F4F6;
+        color: #4B5563;
+    }
+
     .app-error {
         border: 1px solid #FECACA;
         border-radius: 0.25rem;
@@ -276,6 +357,57 @@
         color: #F3D5A3;
     }
 
+    .dark .app-table-container,
+    .app-table-container.dark {
+        border-color: rgb(179 138 94 / 30%);
+        background-color: rgb(30 30 30 / 80%);
+    }
+
+    .dark .app-table,
+    .app-table.dark {
+        color: #F9FAFB;
+    }
+
+    .dark .app-table th,
+    .app-table th.dark {
+        background-color: rgb(10 10 10 / 70%);
+        color: #F3D5A3;
+    }
+
+    .dark .app-table td,
+    .app-table td.dark {
+        border-color: rgb(179 138 94 / 20%);
+    }
+
+    .dark .app-table-action,
+    .app-table-action.dark {
+        border-color: rgb(179 138 94 / 60%);
+        color: #F3D5A3;
+    }
+
+    .dark .app-table-action:hover:not(:disabled),
+    .app-table-action.dark:hover:not(:disabled) {
+        background-color: rgb(212 175 122 / 15%);
+    }
+
+    .dark .app-table-action-danger,
+    .app-table-action-danger.dark {
+        border-color: rgb(248 113 113 / 50%);
+        color: #FCA5A5;
+    }
+
+    .dark .app-user-status-active,
+    .app-user-status-active.dark {
+        background-color: rgb(22 101 52 / 30%);
+        color: #86EFAC;
+    }
+
+    .dark .app-user-status-inactive,
+    .app-user-status-inactive.dark {
+        background-color: rgb(75 85 99 / 35%);
+        color: #D1D5DB;
+    }
+
     .dark .app-modal,
     .app-modal.dark {
         border-color: rgb(179 138 94 / 30%);
@@ -325,6 +457,48 @@
     .app-accent-label,
     .app-accent-text {
         color: #B38A5E;
+    }
+
+    .app-table-container {
+        border-color: rgb(179 138 94 / 30%);
+        background-color: rgb(30 30 30 / 80%);
+    }
+
+    .app-table {
+        color: #F9FAFB;
+    }
+
+    .app-table th {
+        background-color: rgb(10 10 10 / 70%);
+        color: #F3D5A3;
+    }
+
+    .app-table td {
+        border-color: rgb(179 138 94 / 20%);
+    }
+
+    .app-table-action {
+        border-color: rgb(179 138 94 / 60%);
+        color: #F3D5A3;
+    }
+
+    .app-table-action:hover:not(:disabled) {
+        background-color: rgb(212 175 122 / 15%);
+    }
+
+    .app-table-action-danger {
+        border-color: rgb(248 113 113 / 50%);
+        color: #FCA5A5;
+    }
+
+    .app-user-status-active {
+        background-color: rgb(22 101 52 / 30%);
+        color: #86EFAC;
+    }
+
+    .app-user-status-inactive {
+        background-color: rgb(75 85 99 / 35%);
+        color: #D1D5DB;
     }
 
     .app-accent-title {
