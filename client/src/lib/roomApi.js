@@ -21,16 +21,18 @@ export async function listRooms({ roomTypeId } = {}) {
 }
 
 export async function reserveRoom({ roomNumber,
+    guestId,
     firstName, lastName, phoneNumber,
     idNumber, email, checkInDate,
-    period, periodUnit, paidAmount, }) {
-    const response = await send(`/guests/reserve`, {
+    period, periodUnit, paidAmount, roomStatus = 'RESERVED', }) {
+    const response = await apiFetch(`/guests/reserve`, {
         method: 'POST',
         body: JSON.stringify({
             roomNumber,
+            guestId,
             firstName, lastName, phoneNumber,
             idNumber, email, checkInDate,
-            period, periodUnit, paidAmount,
+            period, periodUnit, paidAmount, roomStatus,
         }),
     });
     const data = await response.json();
@@ -40,4 +42,3 @@ export async function reserveRoom({ roomNumber,
     }
     return data;
 }
-

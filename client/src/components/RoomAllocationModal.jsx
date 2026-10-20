@@ -67,6 +67,7 @@ export default function RoomAllocationModal({ room, hourlyRate, onCancel }) {
 
 function RoomReservationForm({ onSubmit, room, hourlyRate }) {
     const [isPartialPayment, setIsPartialPayment] = useState(false);
+    const [roomStatus, setRoomStatus] = useState("RESERVED");
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
     const [idNumber, setIdNumber] = useState("");
@@ -92,6 +93,7 @@ function RoomReservationForm({ onSubmit, room, hourlyRate }) {
             period: Number(period),
             periodUnit,
             paidAmount: isPartialPayment ? Number(partialPaymentAmount) : undefined,
+            roomStatus,
         });
     }
 
@@ -101,6 +103,27 @@ function RoomReservationForm({ onSubmit, room, hourlyRate }) {
             <p className="app-accent-title text-sm">
                 Reservation for room {room}
             </p>
+            <fieldset className="mt-6 space-y-2">
+                <legend className="app-accent-label">Action</legend>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Book or reserve room">
+                    <button
+                        type="button"
+                        aria-pressed={roomStatus === "OCCUPIED"}
+                        onClick={() => setRoomStatus("OCCUPIED")}
+                        className={`app-button ${roomStatus === "OCCUPIED" ? "app-button-primary" : ""}`}
+                    >
+                        Book
+                    </button>
+                    <button
+                        type="button"
+                        aria-pressed={roomStatus === "RESERVED"}
+                        onClick={() => setRoomStatus("RESERVED")}
+                        className={`app-button ${roomStatus === "RESERVED" ? "app-button-primary" : ""}`}
+                    >
+                        Reserve
+                    </button>
+                </div>
+            </fieldset>
             <fieldset className="flex flex-row gap-4 w-full min-w-0 mt-6">
                 <fieldset className="flex flex-col gap-1 w-full min-w-0">
                     <legend className="app-accent-label ">Guest First Name</legend>

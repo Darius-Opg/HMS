@@ -4,6 +4,7 @@ import GuestReservationCard from "../components/ReservedCard";
 import ReservationToolBar from "../components/ReservationToolBar";
 import {
     adjustReservationDetails,
+    checkInReservation,
     confirmCheckOut,
     getReservations,
 } from "../lib/reservationApi";
@@ -81,6 +82,16 @@ export default function ReservationsPage() {
         }
     }
 
+    async function handleCheckIn(reservation) {
+        setError("");
+        try {
+            await checkInReservation({ reservationId: reservation.id });
+            await reloadReservations();
+        } catch (checkInError) {
+            setError(checkInError instanceof Error ? checkInError.message : "Failed to check in guest");
+        }
+    }
+
     const rooms = useMemo(() => (
         [...new Set(reservations.map(({ room }) => room?.roomType?.name).filter(Boolean))]
             .sort((left, right) => left.localeCompare(right))
@@ -148,7 +159,9 @@ export default function ReservationsPage() {
                                     }
                                     balance={reservation.balance}
                                     checkOutDate={reservation.checkOutDate}
+                                    reservationStatus={reservation.status}
                                     onUpdate={() => setReservationToUpdate(reservation)}
+                                    onCheckIn={() => handleCheckIn(reservation)}
                                     onCheckOut={() => setCheckOutUpdate(reservation)}
                                     extraTimeStayedMinutes={reservation.extraTimeStayedMinutes}
                                 />

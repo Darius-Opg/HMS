@@ -17,6 +17,14 @@ export async function getReservations() {
     return data;
 }
 
+export async function checkInReservation({ reservationId }) {
+    const response = await apiFetch("/reservations/checkin", {
+        method: "PATCH",
+        body: JSON.stringify({ reservationId }),
+    });
+    return parseResponse(response, "Failed to check in");
+}
+
 export async function adjustReservationDetails({ reservationId, checkOutTime, paymentType, paidAmount }) {
     const response = await apiFetch("/reservations/update", {
         method: "PATCH",

@@ -5,8 +5,10 @@ import { useAuth } from "../context/AuthContext";
 const navigationLinks = [
     { name: "Dashboard", href: "/", icon: House, role: ["STAFF", "ADMIN"] },
     { name: "Reservations", href: "/reservations", icon: CalendarDays, role: ["STAFF", "ADMIN"] },
+    { name: "Guests", href: "/staff/guests", icon: UsersRound, role: ["STAFF"] },
     { name: "Guests", href: "/guests", icon: UsersRound, role: ["ADMIN"] },
-    { name: "Rooms", href: "/roompage", icon: BedDouble, role: ["ADMIN", "STAFF"] },
+    { name: "Rooms", href: "/roompage", icon: BedDouble, role: ["STAFF"] },
+    { name: "House Keeping", href: "/housekeeping", icon: BedDouble, role: ["ADMIN"] },
     { name: "Staffs", href: "/staff", icon: UserRound, role: ["ADMIN"] },
     { name: "Reports", href: "/reports", icon: ClipboardList, role: ['ADMIN'] },
     { name: "Customize", href:"/custom", icon: PenBoxIcon, role:['ADMIN']},

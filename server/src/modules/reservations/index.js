@@ -10,6 +10,63 @@ export const router = express.Router();
 
 router.use(requireAuth, requirePermission('MANAGE_RESERVATIONS'));
 
+router.patch('/checkin', handle(async (req, res) => {
+    const { reservationId } = req.body ?? {};
+    assertUuid(reservationId, 'reservationId');
+
+    const checkedIn = await prisma.$transaction(async (transaction) => {
+        const reservation = await transaction.reservation.findUnique({
+            where: { id: reservationId },
+            select: { id: true, roomId: true, status: true },
+        });
+        if (!reservation) throw httpError(404, 'Reservation not found');
+        if (reservation.status !== ReservationStatus.BOOKED) {
+            throw httpError(409, 'Only booked reservations can be checked in');
+        }
+
+        const actualCheckIn = new Date();
+        const reservationUpdate = await transaction.reservation.updateMany({
+            where: { id: reservationId, status: ReservationStatus.BOOKED },
+            data: {
+                status: ReservationStatus.CHECKED_IN,
+                actualCheckIn,
+            },
+        });
+        if (reservationUpdate.count !== 1) {
+            throw httpError(409, 'Reservation is no longer available for check-in');
+        }
+
+        const roomUpdate = await transaction.room.updateMany({
+            where: {
+                id: reservation.roomId,
+                status: { in: ['OCCUPIED', 'RESERVED'] },
+            },
+            data: { status: 'OCCUPIED' },
+        });
+        if (roomUpdate.count !== 1) {
+            throw httpError(409, 'Room is no longer available for check-in');
+        }
+
+        return transaction.reservation.findUnique({
+            where: { id: reservationId },
+            include: {
+                guest: { select: { firstName: true, lastName: true } },
+                room: {
+                    select: {
+                        roomNumber: true,
+                        roomType: { select: { name: true } },
+                    },
+                },
+                invoice: {
+                    select: { totalAmount: true, amountPaid: true, paymentStatus: true },
+                },
+            },
+        });
+    });
+
+    res.json(checkedIn);
+}));
+
 function calculateExtraTimeCharge(checkOutDate, rateAtBooking, isActive) {
     const checkOutTime = new Date(checkOutDate).getTime();
     const extraTimeStayedMinutes = isActive && checkOutTime < Date.now()
@@ -148,7 +205,7 @@ router.patch('/checkout', handle(async (req, res) => {
         }
 
         const roomUpdate = await transaction.room.updateMany({
-            where: { id: reservation.roomId, status: 'OCCUPIED' },
+            where: { id: reservation.roomId, status: { in: ['OCCUPIED', 'RESERVED'] } },
             data: { status: 'AVAILABLE' },
         });
         if (roomUpdate.count !== 1) {
@@ -206,7 +263,7 @@ router.get('/', handle(async (req, res) => {
 
     const where = {
         status: { in: statusFilter },
-        room: { is: { status: 'OCCUPIED' } },
+        room: { is: { status: { in: ['OCCUPIED', 'RESERVED'] } } },
     };
 
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || DEFAULT_LIMIT, 1), MAX_LIMIT);

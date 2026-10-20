@@ -19,8 +19,10 @@ export default function GuestReservationCard({
     amountPaid,
     balance,
     checkOutDate,
+    reservationStatus,
     extraTimeStayedMinutes = 0,
     onUpdate,
+    onCheckIn,
     onCheckOut,
 }) {
     const [currentTime, setCurrentTime] = useState(() => Date.now());
@@ -179,15 +181,22 @@ export default function GuestReservationCard({
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
+                    {reservationStatus === "BOOKED" && (
+                        <Button
+                            text="Check In"
+                            onClick={onCheckIn}
+                            className="w-full sm:w-auto text-sm "
+                        />
+                    )}
                     <Button
                         text="Update"
                         onClick={onUpdate}
-                        className="w-full sm:w-auto"
+                        className="w-full sm:w-auto text-sm"
                     />
                     <Button
                         text="Check Out"
                         onClick={onCheckOut}
-                        className="w-full sm:w-auto"
+                        className="w-full sm:w-auto text-sm"
                     />
                 </div>
             </div>

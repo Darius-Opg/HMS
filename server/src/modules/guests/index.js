@@ -1,14 +1,16 @@
 import express from 'express';
 import { requireAuth, requirePermission } from '../auth/access.js';
 import { handle } from '../rooms/index.js';
-import { httpError, withLogging } from '../rooms/roomHelper.js';
+import { assertUuid, httpError, withLogging } from '../rooms/roomHelper.js';
 import { encrypt, hash } from '../security/index.js';
 import { calculateStayDate, calculateTotalFees } from './rateCalculation.js';
+import { listFrontDeskGuests, listGuests } from './guestList.js';
 import prisma from '../database/index.js';
 
 export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
     const {
         roomNumber,
+        guestId,
         firstName,
         lastName,
         phoneNumber,
@@ -18,22 +20,31 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
         period,
         periodUnit,
         paidAmount,
+        roomStatus = 'RESERVED',
     } = req.body ?? {};
 
+    if (guestId !== undefined) assertUuid(guestId, 'guestId');
+
+    const hasRegisteredGuest = typeof guestId === 'string';
     if (
         typeof roomNumber !== 'string' || !roomNumber.trim()
-        || typeof firstName !== 'string' || !firstName.trim()
-        || typeof lastName !== 'string' || !lastName.trim()
-        || typeof phoneNumber !== 'string' || !phoneNumber.trim()
-        || typeof idNumber !== 'string' || !idNumber.trim()
+        || (!hasRegisteredGuest && (
+            typeof firstName !== 'string' || !firstName.trim()
+            || typeof lastName !== 'string' || !lastName.trim()
+            || typeof phoneNumber !== 'string' || !phoneNumber.trim()
+            || typeof idNumber !== 'string' || !idNumber.trim()
+        ))
         || !checkInDate
         || period === undefined || period === null || period === ''
         || !periodUnit
     ) {
-        throw httpError(400, 'roomNumber, firstName, lastName, phoneNumber, idNumber, checkInDate, period, and periodUnit are required');
+        throw httpError(400, 'roomNumber, checkInDate, period, and periodUnit are required; guestId or guest identity details must also be supplied');
     }
     if (email !== undefined && email !== null && typeof email !== 'string') {
         throw httpError(400, 'email must be text');
+    }
+    if (roomStatus !== 'OCCUPIED' && roomStatus !== 'RESERVED') {
+        throw httpError(400, 'roomStatus must be OCCUPIED or RESERVED');
     }
 
     const checkIn = new Date(checkInDate);
@@ -42,8 +53,8 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
         throw httpError(400, 'checkInDate, period, or periodUnit is invalid');
     }
 
-    const idNumberHash = hash(idNumber.trim());
-    const phoneNumberHash = hash(phoneNumber.trim());
+    const idNumberHash = !hasRegisteredGuest ? hash(idNumber.trim()) : null;
+    const phoneNumberHash = !hasRegisteredGuest ? hash(phoneNumber.trim()) : null;
     const normalizedEmail = email?.trim() || null;
     const normalizedRoomNumber = roomNumber.trim();
 
@@ -82,26 +93,35 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
         }
         const paymentStatus = amountPaid >= totalAmount ? 'PAID' : 'PARTIAL';
 
-        const existingGuest = await transaction.guest.findUnique({
-            where: { idNumberHash },
-            select: { id: true },
-        });
-        const guest = existingGuest ?? await transaction.guest.create({
-            data: {
-                firstName: firstName.trim(),
-                lastName: lastName.trim(),
-                email: normalizedEmail,
-                phoneEncrypted: encrypt(phoneNumber.trim()),
-                phoneHash: phoneNumberHash,
-                idNumberEncrypted: encrypt(idNumber.trim()),
-                idNumberHash,
-            },
-            select: { id: true },
-        });
+        let guest;
+        if (hasRegisteredGuest) {
+            guest = await transaction.guest.findUnique({
+                where: { id: guestId },
+                select: { id: true },
+            });
+            if (!guest) throw httpError(404, 'Guest not found');
+        } else {
+            const existingGuest = await transaction.guest.findUnique({
+                where: { idNumberHash },
+                select: { id: true },
+            });
+            guest = existingGuest ?? await transaction.guest.create({
+                data: {
+                    firstName: firstName.trim(),
+                    lastName: lastName.trim(),
+                    email: normalizedEmail,
+                    phoneEncrypted: encrypt(phoneNumber.trim()),
+                    phoneHash: phoneNumberHash,
+                    idNumberEncrypted: encrypt(idNumber.trim()),
+                    idNumberHash,
+                },
+                select: { id: true },
+            });
+        }
 
         const roomUpdate = await transaction.room.updateMany({
             where: { id: room.id, status: 'AVAILABLE' },
-            data: { status: 'OCCUPIED' },
+            data: { status: roomStatus },
         });
         if (roomUpdate.count !== 1) {
             throw httpError(409, 'Room is no longer available');
@@ -137,3 +157,10 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
 export const router = express.Router();
 router.use(requireAuth, requirePermission('MANAGE_GUESTS'));
 router.post('/reserve', handle(reserveRoom));
+router.get('/', (req, res, next) => {
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    next();
+}, handle(listGuests));
+router.get('/frontdesk', handle(listFrontDeskGuests));
