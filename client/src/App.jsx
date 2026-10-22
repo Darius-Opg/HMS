@@ -11,6 +11,7 @@ import ReservationPage from './pages/ReservationsPage';
 import UsersPage from './pages/UsersPage';
 import GuestPage from './pages/GuestPage';
 import StaffGuestPage from './pages/StaffGuestPage';
+import HouseKeeping from './pages/HouseKeeping';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -27,6 +28,7 @@ function AppRoutes() {
         <Route path='/staff' element={<UsersPage />} />
         <Route path='/guests' element={<GuestPage />} />
         <Route path='/staff/guests' element={<StaffGuestPage />} />
+        <Route path='/housekeeping' element={<HouseKeeping />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

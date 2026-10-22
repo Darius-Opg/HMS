@@ -1,4 +1,4 @@
-import { httpError, withLogging, positiveNumber } from './roomHelper.js';
+import { assertUuid, httpError, withLogging, positiveNumber } from './roomHelper.js';
 import prisma from "../database/index.js";
 
 

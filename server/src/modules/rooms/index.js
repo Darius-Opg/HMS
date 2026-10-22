@@ -1,7 +1,7 @@
 
 import express from 'express';
 import { requireAuth, requirePermission } from "../auth/access.js";
-import { deleteRoomType, listRoomTypes, updateRoomType } from './roomTypes.js';
+import { createRoomType, deleteRoomType, getRoomTypeById, listRoomTypes, updateRoomType } from './roomTypes.js';
 import { findAvailableRooms } from './roomAvailability.js';
 import { createRoom, deleteRoom, getRoomById, listRooms, setRoomStatus, updateRoom } from './rooms.js';
 
@@ -94,4 +94,3 @@ router.delete('/:id', handle(async (req, res) => {
     await deleteRoom(req.params.id);
     res.status(204).end();
 }));
-
