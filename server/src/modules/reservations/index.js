@@ -17,7 +17,13 @@ router.patch('/checkin', handle(async (req, res) => {
     const checkedIn = await prisma.$transaction(async (transaction) => {
         const reservation = await transaction.reservation.findUnique({
             where: { id: reservationId },
-            select: { id: true, roomId: true, status: true },
+            select: {
+                id: true,
+                roomId: true,
+                status: true,
+                checkInDate: true,
+                checkOutDate: true,
+            },
         });
         if (!reservation) throw httpError(404, 'Reservation not found');
         if (reservation.status !== ReservationStatus.BOOKED) {
@@ -25,11 +31,15 @@ router.patch('/checkin', handle(async (req, res) => {
         }
 
         const actualCheckIn = new Date();
+        const scheduledStayDuration = reservation.checkOutDate.getTime() - reservation.checkInDate.getTime();
         const reservationUpdate = await transaction.reservation.updateMany({
             where: { id: reservationId, status: ReservationStatus.BOOKED },
             data: {
                 status: ReservationStatus.CHECKED_IN,
                 actualCheckIn,
+                ...(actualCheckIn < reservation.checkInDate && {
+                    checkOutDate: new Date(actualCheckIn.getTime() + scheduledStayDuration),
+                }),
             },
         });
         if (reservationUpdate.count !== 1) {
