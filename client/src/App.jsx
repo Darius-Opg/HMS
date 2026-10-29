@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthProvider';
 import { useAuth } from './context/AuthContext';
 import Login from "./pages/Login";
 import Dashboard from './pages/Dashboard';
+import Account from './pages/Account';
 import RoomPage from './pages/RoomPage';
 import { StaffLayoutWrapper } from './layout/StaffLayout';
 import { AdminLayoutWrapper } from './layout/AdminLayout';
@@ -23,6 +24,7 @@ function AppRoutes() {
 
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/account" element={<Account />} />
         <Route path="/roompage" element={<RoomPage />} />
         <Route path="/reservations" element={<ReservationPage />} />
         <Route path='/staff' element={<UsersPage />} />

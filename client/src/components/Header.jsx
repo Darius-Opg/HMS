@@ -42,6 +42,7 @@ export default function Header() {
                 type="button"
                 aria-label="User profile"
                 className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-400 transition hover:ring-2 hover:ring-[#D4AF7A] sm:h-10 sm:w-10"
+                onClick={() => navigate('/account')}
             >
                 <User className="h-5 w-5 text-white" />
             </button>
