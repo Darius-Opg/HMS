@@ -1,6 +1,7 @@
 // client/src/pages/Login.jsx
 
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,7 @@ export default function Login() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [serverError, setServerError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   if (loading) return null;
   if (user) return <Navigate to={location.state?.from?.pathname || '/'} replace />;
@@ -99,15 +101,26 @@ export default function Login() {
           <label htmlFor="password" className="app-accent-label block text-sm">
             Password
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            value={form.password}
-            onChange={handleChange}
-            className="app-input mt-1 w-full"
-          />
+          <div className="relative mt-1">
+            <input
+              id="password"
+              name="password"
+              type={isPasswordVisible ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={form.password}
+              onChange={handleChange}
+              className="app-input w-full pr-10"
+            />
+            <button
+              type="button"
+              aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+              aria-pressed={isPasswordVisible}
+              onClick={() => setIsPasswordVisible((visible) => !visible)}
+              className="app-muted-text absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center hover:text-current"
+            >
+              {isPasswordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>
+          </div>
           {fieldErrors.password && (
             <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
           )}

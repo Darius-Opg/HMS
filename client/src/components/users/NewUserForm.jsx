@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import Button from "../Button";
 import { registerNewUser } from "../../lib/usersApi";
 
@@ -8,6 +9,7 @@ export default function NewUserForm({ onClose, onUserCreated }) {
     const [phone, setPhone] = useState("");
     const [idNumber, setIdNumber] = useState("");
     const [password, setPassword] = useState("");
+    const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [role, setRole] = useState("STAFF");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submissionError, setSubmissionError] = useState("");
@@ -99,17 +101,28 @@ export default function NewUserForm({ onClose, onUserCreated }) {
                 </div>
                 <div className="flex min-w-0 flex-col gap-1">
                     <label htmlFor="new-user-password" className="app-accent-label">Password</label>
-                    <input
-                        id="new-user-password"
-                        name="password"
-                        type="password"
-                        autoComplete="new-password"
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        required
-                        className="app-input h-10 w-full"
-                        placeholder="Set an initial password"
-                    />
+                    <div className="relative">
+                        <input
+                            id="new-user-password"
+                            name="password"
+                            type={isPasswordVisible ? "text" : "password"}
+                            autoComplete="new-password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            required
+                            className="app-input h-10 w-full pr-10"
+                            placeholder="Set an initial password"
+                        />
+                        <button
+                            type="button"
+                            aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                            aria-pressed={isPasswordVisible}
+                            onClick={() => setIsPasswordVisible((visible) => !visible)}
+                            className="app-muted-text absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center hover:text-current"
+                        >
+                            {isPasswordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                        </button>
+                    </div>
                 </div>
                 <div className="flex min-w-0 flex-col gap-1">
                     <label htmlFor="new-user-role" className="app-accent-label">Role</label>

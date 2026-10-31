@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { resetPasswordWithToken } from "../lib/usersApi.js";
 
@@ -7,6 +8,8 @@ export default function ResetPassword() {
     const token = searchParams.get("token") ?? "";
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+    const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,14 +55,36 @@ export default function ResetPassword() {
 
                 {!success && (
                     <>
-                        <label className="flex flex-col gap-1">
-                            <span className="app-accent-label">New password</span>
-                            <input type="password" autoComplete="new-password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} className="app-input h-10 w-full" />
-                        </label>
-                        <label className="flex flex-col gap-1">
-                            <span className="app-accent-label">Confirm new password</span>
-                            <input type="password" autoComplete="new-password" minLength={8} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="app-input h-10 w-full" />
-                        </label>
+                        <div className="flex flex-col gap-1">
+                            <label htmlFor="reset-password" className="app-accent-label">New password</label>
+                            <div className="relative">
+                                <input id="reset-password" type={isPasswordVisible ? "text" : "password"} autoComplete="new-password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} className="app-input h-10 w-full pr-10" />
+                                <button
+                                    type="button"
+                                    aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                                    aria-pressed={isPasswordVisible}
+                                    onClick={() => setIsPasswordVisible((visible) => !visible)}
+                                    className="app-muted-text absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center hover:text-current"
+                                >
+                                    {isPasswordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label htmlFor="confirm-reset-password" className="app-accent-label">Confirm new password</label>
+                            <div className="relative">
+                                <input id="confirm-reset-password" type={isConfirmPasswordVisible ? "text" : "password"} autoComplete="new-password" minLength={8} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="app-input h-10 w-full pr-10" />
+                                <button
+                                    type="button"
+                                    aria-label={isConfirmPasswordVisible ? "Hide password" : "Show password"}
+                                    aria-pressed={isConfirmPasswordVisible}
+                                    onClick={() => setIsConfirmPasswordVisible((visible) => !visible)}
+                                    className="app-muted-text absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center hover:text-current"
+                                >
+                                    {isConfirmPasswordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                                </button>
+                            </div>
+                        </div>
                         <button type="submit" disabled={isSubmitting || !token} className="app-button-primary w-full disabled:cursor-not-allowed disabled:opacity-50">
                             {isSubmitting ? "Updating password…" : "Update password"}
                         </button>
