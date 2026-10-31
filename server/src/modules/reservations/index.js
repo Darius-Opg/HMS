@@ -4,6 +4,7 @@ import { ReservationStatus } from '../../generated/prisma/index.js';
 import { requireAuth, requirePermission } from '../auth/access.js';
 import { handle } from '../rooms/index.js';
 import { assertUuid, httpError, parseDate } from '../rooms/roomHelper.js';
+import { logActivity } from '../audit/logActivity.js';
 
 
 export const router = express.Router();
@@ -74,6 +75,13 @@ router.patch('/checkin', handle(async (req, res) => {
         });
     });
 
+    await logActivity({
+        action: 'GUEST_CHECKED_IN',
+        entityType: 'GUEST',
+        entityId: checkedIn.guestId,
+        performedById: req.user.id,
+        metadata: { reservationId, roomNumber: checkedIn.room?.roomNumber },
+    });
     res.json(checkedIn);
 }));
 
@@ -158,6 +166,19 @@ router.patch('/update', handle(async (req, res) => {
         });
     });
 
+    await logActivity({
+        action: 'RESERVATION_UPDATED',
+        entityType: 'GUEST',
+        entityId: updated.guestId,
+        performedById: req.user.id,
+        metadata: {
+            reservationId,
+            checkOutDate: updated.checkOutDate.toISOString(),
+            amountPaid: Number(updated.invoice.amountPaid),
+            totalAmount: Number(updated.invoice.totalAmount),
+            paymentStatus: updated.invoice.paymentStatus,
+        },
+    });
     res.json(updated);
 }));
 
@@ -240,6 +261,18 @@ router.patch('/checkout', handle(async (req, res) => {
         });
     });
 
+    await logActivity({
+        action: 'GUEST_CHECKED_OUT',
+        entityType: 'GUEST',
+        entityId: checkedOut.guestId,
+        performedById: req.user.id,
+        metadata: {
+            reservationId,
+            roomNumber: checkedOut.room?.roomNumber,
+            actualCheckOut: checkedOut.actualCheckOut?.toISOString(),
+            paymentStatus: checkedOut.invoice?.paymentStatus,
+        },
+    });
     res.json(checkedOut);
 }));
 
@@ -289,6 +322,13 @@ router.patch('/cancel', handle(async (req, res) => {
         });
     });
 
+    await logActivity({
+        action: 'RESERVATION_CANCELLED',
+        entityType: 'GUEST',
+        entityId: cancelled.guestId,
+        performedById: req.user.id,
+        metadata: { reservationId, roomNumber: cancelled.room?.roomNumber },
+    });
     res.json(cancelled);
 }));
 
@@ -341,7 +381,7 @@ router.get('/', handle(async (req, res) => {
                     },
                 },
                 invoice: {
-                    select: { totalAmount: true, amountPaid: true, paymentStatus: true },
+                    select: { totalAmount: true, amountPaid: true, extraCharges: true, paymentStatus: true },
                 },
             },
         }),

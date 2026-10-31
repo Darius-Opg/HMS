@@ -1,4 +1,4 @@
-
+import { logError } from '../audit/logActivity.js';
 
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -33,14 +33,12 @@ export function parseDate(value, field) {
     return date;
 }
 
-// One place to hook logging later: every service function below is
-// wrapped in this, and it rethrows, so behaviour is unchanged.
 export function withLogging(name, fn) {
     return async (...args) => {
         try {
             return await fn(...args);
         } catch (error) {
-            // TODO: logging (`name` identifies which function failed)
+            logError(name, error);
             throw error;
         }
     };

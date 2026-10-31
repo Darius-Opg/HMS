@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import prisma from "../database/index.js";
 import { decrypt, encrypt, hash } from "../security/index.js";
 import { requireAuth, requirePermission } from "../auth/access.js";
+import { logActivity, logError } from "../audit/logActivity.js";
 
 const SALT_ROUNDS = 12;
 
@@ -43,19 +44,19 @@ export async function createUser({ name, email, phone, password, idNumber, role 
         return newUser;
     }
     catch (error) {
-        // TODO: logging
+        logError('user create service', error);
         throw error;
     }
 }
 
 export async function findByEmailForAuth(email) {
     try {
-        return prisma.user.findFirst({
+        return await prisma.user.findFirst({
             where: { email, isActive: true, isDelete: false },
             omit: { password: false },
         });
     } catch (error) {
-        // TODO: logging
+        logError('user authentication lookup', error);
         throw error;
 
     }
@@ -135,7 +136,7 @@ export async function getUserById(id) {
         });
     }
     catch (error) {
-        // TODO: logging
+        logError('user lookup', error);
         throw error;
     }
 }
@@ -169,8 +170,10 @@ router.post('/', async (req, res) => {
 
     try {
         const user = await createUser({ name, email, phone, idNumber, password, role, permissions });
+        await logActivity({ action: 'USER_CREATED', entityType: 'USER', entityId: user.id, performedById: req.user.id, metadata: { role: user.role } });
         res.status(201).json(user);
     } catch (err) {
+        logError('user create', err);
         res.status(400).json({ error: 'Could not create user', detail: err.message });
     }
 });
@@ -196,8 +199,10 @@ router.patch('/:id', async (req, res) => {
             phone,
             idNumber,
         });
+        await logActivity({ action: 'USER_UPDATED', entityType: 'USER', entityId: user.id, performedById: req.user.id, metadata: { role: user.role } });
         res.json(user);
     } catch (err) {
+        logError('user update', err);
         res.status(400).json({ error: 'Could not update user', detail: err.message });
     }
 });
@@ -208,8 +213,10 @@ router.post('/:id/deactivate', async (req, res) => {
 
     try {
         const user = await deactivateUser(req.params.id, reason);
+        await logActivity({ action: 'USER_DEACTIVATED', entityType: 'USER', entityId: user.id, performedById: req.user.id });
         res.json(user);
     } catch (err) {
+        logError('user deactivation', err);
         res.status(400).json({ error: 'Could not deactivate user', detail: err.message });
     }
 });
@@ -217,8 +224,10 @@ router.post('/:id/deactivate', async (req, res) => {
 router.post('/:id/reactivate', async (req, res) => {
     try {
         const user = await reactivateUser(req.params.id);
+        await logActivity({ action: 'USER_REACTIVATED', entityType: 'USER', entityId: user.id, performedById: req.user.id });
         res.json(user);
     } catch (err) {
+        logError('user reactivation', err);
         res.status(400).json({ error: 'Could not reactivate user', detail: err.message });
     }
 });
@@ -229,8 +238,10 @@ router.delete('/:id', async (req, res) => {
 
     try {
         const user = await softDeleteUser(req.params.id, reason);
+        await logActivity({ action: 'USER_DELETED', entityType: 'USER', entityId: user.id, performedById: req.user.id });
         res.json(user);
     } catch (err) {
+        logError('user deletion', err);
         res.status(400).json({ error: 'Could not delete user', detail: err.message });
     }
 });

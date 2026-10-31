@@ -214,10 +214,37 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
 export function CheckOutCard({ onClose, onSubmit, reservation }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submissionError, setSubmissionError] = useState("");
+    const [currentTime, setCurrentTime] = useState(() => Date.now());
     const roomNumber = reservation?.room?.roomNumber;
     const guestName = [reservation?.guest?.firstName, reservation?.guest?.lastName]
         .filter(Boolean)
         .join(" ");
+
+    useEffect(() => {
+        const timer = window.setInterval(() => setCurrentTime(Date.now()), 30_000);
+        return () => window.clearInterval(timer);
+    }, []);
+
+    const checkInTime = new Date(reservation?.checkInDate).getTime();
+    const scheduledCheckOut = new Date(reservation?.checkOutDate).getTime();
+    const amountPaid = Number(reservation?.invoice?.amountPaid ?? 0);
+    const invoiceTotal = Number(reservation?.invoice?.totalAmount ?? 0);
+    const extraCharges = Number(reservation?.invoice?.extraCharges ?? 0);
+    const hourlyRate = Number(reservation?.rateAtBooking ?? 0);
+    const hasPaidInFull = reservation?.invoice?.paymentStatus === "PAID" && amountPaid >= invoiceTotal;
+    const isEarlyCheckout = Number.isFinite(scheduledCheckOut)
+        && Number.isFinite(checkInTime)
+        && currentTime < scheduledCheckOut;
+    const hoursStayed = Number.isFinite(checkInTime)
+        ? Math.max((currentTime - checkInTime) / 3_600_000, 0)
+        : 0;
+    const actualStayCharge = Math.round((hourlyRate * hoursStayed + extraCharges) * 100) / 100;
+    const refundAmount = Math.max(Math.round((amountPaid - actualStayCharge) * 100) / 100, 0);
+    const formatCurrency = (amount) => new Intl.NumberFormat("en-KE", {
+        style: "currency",
+        currency: "KES",
+        minimumFractionDigits: 2,
+    }).format(amount);
 
     async function handleCheckOut() {
         if (!onSubmit) return;
@@ -263,6 +290,14 @@ export function CheckOutCard({ onClose, onSubmit, reservation }) {
                     </div>
                 </div>
             </div>
+
+            {isEarlyCheckout && hasPaidInFull && refundAmount > 0 && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+                    <p className="app-accent-label">Refund to give the guest</p>
+                    <p className="mt-1 text-lg font-semibold text-amber-900 dark:text-amber-200">{formatCurrency(refundAmount)}</p>
+                    <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">Estimated from the time stayed at the booked hourly rate.</p>
+                </div>
+            )}
 
             <p className="app-muted-text text-sm leading-6">
                 Checking out will end this stay and make the room available for another reservation.

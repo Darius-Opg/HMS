@@ -168,7 +168,7 @@ export default function GuestPage({ frontDesk = false }) {
                             if (!isActionSubmitting) setSelectedAction(null);
                         }}
                         title={selectedAction.type === "history"
-                            ? "Guest reservation history"
+                            ? "Guest activity history"
                             : selectedAction.type === "delete"
                                 ? "Confirm guest soft delete"
                                 : "Reserve a room for guest"}

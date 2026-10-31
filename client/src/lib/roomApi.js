@@ -42,3 +42,21 @@ export async function reserveRoom({ roomNumber,
     }
     return data;
 }
+
+async function readGuestActionResponse(response, fallbackMessage) {
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.error || fallbackMessage);
+    return data;
+}
+
+export async function findGuestByIdNumber(idNumber) {
+    const query = new URLSearchParams({ idNumber });
+    const response = await apiFetch(`/guests/lookup?${query}`);
+    return readGuestActionResponse(response, "Could not look up guest.");
+}
+
+export async function checkRoomNumberAvailability({ roomNumber, checkInDate, period, periodUnit }) {
+    const query = new URLSearchParams({ roomNumber, checkInDate, period: String(period), periodUnit });
+    const response = await apiFetch(`/guests/room-availability?${query}`);
+    return readGuestActionResponse(response, "Could not check room availability.");
+}

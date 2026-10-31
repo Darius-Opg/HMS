@@ -4,6 +4,7 @@ import { requireAuth, requirePermission } from "../auth/access.js";
 import { createRoomType, deleteRoomType, getRoomTypeById, listRoomTypes, updateRoomType } from './roomTypes.js';
 import { findAvailableRooms } from './roomAvailability.js';
 import { createRoom, deleteRoom, getRoomById, listRooms, setRoomStatus, updateRoom } from './rooms.js';
+import { logActivity, logError } from '../audit/logActivity.js';
 
 
 
@@ -17,7 +18,7 @@ export function sendError(res, error) {
     if (error.code === 'P2003') {
         return res.status(400).json({ error: 'Invalid reference, or the record is still in use' });
     }
-    console.error('rooms module error:', error); // temporary, until logging lands
+    logError('rooms module', error);
     return res.status(500).json({ error: 'Internal server error' });
 }
 
@@ -41,7 +42,9 @@ router.get('/types', handle(async (req, res) => {
 }));
 
 router.post('/types', handle(async (req, res) => {
-    res.status(201).json(await createRoomType(req.body ?? {}));
+    const roomType = await createRoomType(req.body ?? {});
+    await logActivity({ action: 'ROOM_TYPE_CREATED', entityType: 'ROOM_TYPE', entityId: roomType.id, performedById: req.user.id, metadata: { name: roomType.name } });
+    res.status(201).json(roomType);
 }));
 
 router.get('/types/:id', handle(async (req, res) => {
@@ -49,11 +52,14 @@ router.get('/types/:id', handle(async (req, res) => {
 }));
 
 router.patch('/types/:id', handle(async (req, res) => {
-    res.json(await updateRoomType(req.params.id, req.body ?? {}));
+    const roomType = await updateRoomType(req.params.id, req.body ?? {});
+    await logActivity({ action: 'ROOM_TYPE_UPDATED', entityType: 'ROOM_TYPE', entityId: roomType.id, performedById: req.user.id, metadata: { name: roomType.name } });
+    res.json(roomType);
 }));
 
 router.delete('/types/:id', handle(async (req, res) => {
-    await deleteRoomType(req.params.id);
+    const roomType = await deleteRoomType(req.params.id);
+    await logActivity({ action: 'ROOM_TYPE_DELETED', entityType: 'ROOM_TYPE', entityId: roomType.id, performedById: req.user.id, metadata: { name: roomType.name } });
     res.status(204).end();
 }));
 
@@ -75,7 +81,9 @@ router.get('/', handle(async (req, res) => {
 }));
 
 router.post('/', handle(async (req, res) => {
-    res.status(201).json(await createRoom(req.body ?? {}));
+    const room = await createRoom(req.body ?? {});
+    await logActivity({ action: 'ROOM_CREATED', entityType: 'ROOM', entityId: room.id, performedById: req.user.id, metadata: { roomNumber: room.roomNumber } });
+    res.status(201).json(room);
 }));
 
 router.get('/:id', handle(async (req, res) => {
@@ -83,14 +91,19 @@ router.get('/:id', handle(async (req, res) => {
 }));
 
 router.patch('/:id', handle(async (req, res) => {
-    res.json(await updateRoom(req.params.id, req.body ?? {}));
+    const room = await updateRoom(req.params.id, req.body ?? {});
+    await logActivity({ action: 'ROOM_UPDATED', entityType: 'ROOM', entityId: room.id, performedById: req.user.id, metadata: { roomNumber: room.roomNumber } });
+    res.json(room);
 }));
 
 router.patch('/:id/status', handle(async (req, res) => {
-    res.json(await setRoomStatus(req.params.id, req.body?.status));
+    const room = await setRoomStatus(req.params.id, req.body?.status);
+    await logActivity({ action: 'ROOM_STATUS_UPDATED', entityType: 'ROOM', entityId: room.id, performedById: req.user.id, metadata: { roomNumber: room.roomNumber, status: room.status } });
+    res.json(room);
 }));
 
 router.delete('/:id', handle(async (req, res) => {
-    await deleteRoom(req.params.id);
+    const room = await deleteRoom(req.params.id);
+    await logActivity({ action: 'ROOM_DELETED', entityType: 'ROOM', entityId: room.id, performedById: req.user.id, metadata: { roomNumber: room.roomNumber } });
     res.status(204).end();
 }));

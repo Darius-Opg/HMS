@@ -1,11 +1,12 @@
 import express from 'express';
 import { requireAuth, requirePermission } from '../auth/access.js';
 import { handle } from '../rooms/index.js';
-import { assertUuid, httpError, withLogging } from '../rooms/roomHelper.js';
-import { encrypt, hash } from '../security/index.js';
+import { assertUuid, httpError, parseDate, withLogging } from '../rooms/roomHelper.js';
+import { decrypt, encrypt, hash } from '../security/index.js';
 import { calculateStayDate, calculateTotalFees } from './rateCalculation.js';
 import { listFrontDeskGuests, listGuests } from './guestList.js';
 import prisma from '../database/index.js';
+import { logActivity } from '../audit/logActivity.js';
 
 export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
     const {
@@ -58,6 +59,7 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
     const normalizedEmail = email?.trim() || null;
     const normalizedRoomNumber = roomNumber.trim();
 
+    let createdGuest = false;
     const reservation = await prisma.$transaction(async (transaction) => {
         const room = await transaction.room.findUnique({
             where: { roomNumber: normalizedRoomNumber },
@@ -105,18 +107,23 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
                 where: { idNumberHash },
                 select: { id: true },
             });
-            guest = existingGuest ?? await transaction.guest.create({
-                data: {
-                    firstName: firstName.trim(),
-                    lastName: lastName.trim(),
-                    email: normalizedEmail,
-                    phoneEncrypted: encrypt(phoneNumber.trim()),
-                    phoneHash: phoneNumberHash,
-                    idNumberEncrypted: encrypt(idNumber.trim()),
-                    idNumberHash,
-                },
-                select: { id: true },
-            });
+            if (existingGuest) {
+                guest = existingGuest;
+            } else {
+                guest = await transaction.guest.create({
+                    data: {
+                        firstName: firstName.trim(),
+                        lastName: lastName.trim(),
+                        email: normalizedEmail,
+                        phoneEncrypted: encrypt(phoneNumber.trim()),
+                        phoneHash: phoneNumberHash,
+                        idNumberEncrypted: encrypt(idNumber.trim()),
+                        idNumberHash,
+                    },
+                    select: { id: true },
+                });
+                createdGuest = true;
+            }
         }
 
         const roomUpdate = await transaction.room.updateMany({
@@ -151,11 +158,98 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
         });
     });
 
+    if (createdGuest) {
+        await logActivity({
+            action: 'GUEST_CREATED',
+            entityType: 'GUEST',
+            entityId: reservation.guestId,
+            performedById: req.user.id,
+            metadata: { source: 'reservation' },
+        });
+    }
+    await logActivity({
+        action: 'RESERVATION_CREATED',
+        entityType: 'GUEST',
+        entityId: reservation.guestId,
+        performedById: req.user.id,
+        metadata: {
+            reservationId: reservation.id,
+            roomNumber: reservation.room.roomNumber,
+            status: reservation.status,
+            checkInDate: reservation.checkInDate.toISOString(),
+            checkOutDate: reservation.checkOutDate.toISOString(),
+            amountPaid: Number(reservation.invoice.amountPaid),
+            totalAmount: Number(reservation.invoice.totalAmount),
+        },
+    });
+
     res.status(201).json(reservation);
 });
 
 export const router = express.Router();
 router.use(requireAuth, requirePermission('MANAGE_GUESTS'));
+
+router.get('/lookup', handle(async (req, res) => {
+    const idNumber = typeof req.query.idNumber === 'string' ? req.query.idNumber.trim() : '';
+    if (!idNumber) throw httpError(400, 'idNumber is required');
+
+    const guest = await prisma.guest.findUnique({
+        where: { idNumberHash: hash(idNumber) },
+        select: { id: true, firstName: true, lastName: true, email: true, phoneEncrypted: true },
+    });
+    if (!guest) return res.json(null);
+
+    const { phoneEncrypted, ...guestDetails } = guest;
+    res.json({ ...guestDetails, phoneNumber: decrypt(phoneEncrypted) });
+}));
+
+router.get('/room-availability', handle(async (req, res) => {
+    const roomNumber = typeof req.query.roomNumber === 'string' ? req.query.roomNumber.trim() : '';
+    if (!roomNumber) throw httpError(400, 'roomNumber is required');
+
+    const checkIn = parseDate(req.query.checkInDate, 'checkInDate');
+    const checkOut = calculateStayDate(req.query.period, req.query.periodUnit, checkIn);
+    if (!checkOut || checkOut <= checkIn) {
+        throw httpError(400, 'checkInDate, period, or periodUnit is invalid');
+    }
+
+    const room = await prisma.room.findUnique({
+        where: { roomNumber },
+        select: { id: true, roomNumber: true, status: true, roomType: { select: { name: true, basePrice: true } } },
+    });
+    if (!room) return res.json({ available: false, reason: 'Room not found' });
+
+    const overlappingReservation = await prisma.reservation.findFirst({
+        where: {
+            roomId: room.id,
+            status: { in: ['BOOKED', 'CHECKED_IN'] },
+            checkInDate: { lt: checkOut },
+            checkOutDate: { gt: checkIn },
+        },
+        select: { id: true },
+    });
+    const available = room.status === 'AVAILABLE' && !overlappingReservation;
+    res.json({
+        available,
+        reason: available ? null : room.status === 'MAINTENANCE' ? 'Room is under maintenance' : 'Room is not available for these dates',
+        room: { roomNumber: room.roomNumber, roomType: room.roomType },
+    });
+}));
+
+router.get('/:guestId/history', handle(async (req, res) => {
+    const { guestId } = req.params;
+    assertUuid(guestId, 'guest id');
+    const guest = await prisma.guest.findUnique({ where: { id: guestId }, select: { id: true } });
+    if (!guest) throw httpError(404, 'Guest not found');
+
+    const activities = await prisma.auditLog.findMany({
+        where: { entityType: 'GUEST', entityId: guestId },
+        orderBy: { createdAt: 'desc' },
+        include: { performedBy: { select: { id: true, name: true } } },
+    });
+    res.json(activities);
+}));
+
 router.post('/reserve', handle(reserveRoom));
 router.get('/', (req, res, next) => {
     if (req.user?.role !== 'ADMIN') {

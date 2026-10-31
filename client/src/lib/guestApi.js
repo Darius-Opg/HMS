@@ -45,6 +45,15 @@ export function getFrontDeskGuests() {
     return listGuests("/guests/frontdesk", "Could not load front desk guests.");
 }
 
+export async function getGuestHistory(guestId) {
+    const response = await apiFetch(`/guests/${encodeURIComponent(guestId)}/history`);
+    const activities = await readResponse(response, "Could not load guest activity history.");
+    if (!Array.isArray(activities)) {
+        throw new Error("The guest activity response was not a list.");
+    }
+    return activities;
+}
+
 export async function softDeleteGuest(guestId) {
     if (!guestId) {
         throw new Error("A guest ID is required to delete a guest.");

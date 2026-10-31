@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import GuestReservationCard from "../components/ReservedCard";
 import ReservationToolBar from "../components/ReservationToolBar";
+import NewReservationForm from "../components/NewReservationForm";
 import {
     adjustReservationDetails,
     cancelReservation,
@@ -16,8 +16,8 @@ function getGuestName(guest) {
 }
 
 export default function ReservationsPage() {
-    const navigate = useNavigate();
     const [reservations, setReservations] = useState([]);
+    const [isNewReservationOpen, setIsNewReservationOpen] = useState(false);
     const [reservationToUpdate, setReservationToUpdate] = useState(null);
     const [checkOutUpdate, setCheckOutUpdate] = useState(null);
     const [filters, setFilters] = useState({
@@ -134,7 +134,7 @@ export default function ReservationsPage() {
                     rooms={rooms}
                     initialFilters={filters}
                     onFiltersChange={setFilters}
-                    onNewReservation={() => navigate("/")}
+                    onNewReservation={() => setIsNewReservationOpen(true)}
                 />
 
                 {isLoading && (
@@ -151,7 +151,7 @@ export default function ReservationsPage() {
 
                 {!isLoading && !error && reservations.length === 0 && (
                     <p className="app-card app-muted-text p-5 text-sm">
-                        No reservations yet. Select a room type to create your first reservation.
+                        No reservations yet. Create one with the New Reservation button.
                     </p>
                 )}
 
@@ -195,6 +195,23 @@ export default function ReservationsPage() {
                     </section>
                 )}
             </div>
+            {isNewReservationOpen && (
+                <ReservationModal
+                    onClose={() => setIsNewReservationOpen(false)}
+                    title="Create a new reservation"
+                >
+                    <NewReservationForm
+                        onClose={() => setIsNewReservationOpen(false)}
+                        onCreated={async () => {
+                            try {
+                                await reloadReservations();
+                            } catch (loadError) {
+                                setError(loadError instanceof Error ? loadError.message : "Failed to refresh reservations");
+                            }
+                        }}
+                    />
+                </ReservationModal>
+            )}
             {reservationToUpdate && (
                 <ReservationModal
                     onClose={() => setReservationToUpdate(null)}

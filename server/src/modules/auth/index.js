@@ -9,6 +9,7 @@ import prisma from "../database/index.js";
 import { findByEmailForAuth, getUserById } from "../users/index.js";
 import { clearAuthCookies, setAuthCookies } from './cookies.js';
 import { authLimiter } from './rateLimit.js';
+import { logActivity, logError } from '../audit/logActivity.js';
 
 const ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET;
 const ACCESS_TOKEN_TTL_MINUTES = process.env.JWT_ACCESS_TTL_MINUTES || 15;
@@ -68,7 +69,7 @@ export async function login(email, password) {
         return { accessToken, refreshToken, user: safeUser };
     }
     catch (error) {
-        console.error('login failed:', error); // temporary, remove once resolved
+        logError('auth login', error);
         throw error;
     }
 }
@@ -113,7 +114,7 @@ export async function logout(rawRefreshToken) {
         });
     }
     catch (error) {
-        // Log the error for debugging purposes
+        logError('auth logout', error);
     }
 }
 
@@ -130,6 +131,13 @@ router.post('/login', authLimiter, async (req, res) => {
     }
     try {
         const { accessToken, refreshToken, user } = await login(email, password);
+        await logActivity({
+            action: 'USER_LOGIN',
+            entityType: 'USER',
+            entityId: user.id,
+            performedById: user.id,
+            metadata: { role: user.role },
+        });
         setAuthCookies(res, accessToken, refreshToken);
         res.status(200).json({ user, accessToken });
     }
@@ -147,7 +155,7 @@ router.post('/refresh', async (req, res) => {
         setAuthCookies(res, accessToken, refreshToken);
         res.json({ accessToken, user });
     } catch (err) {
-        console.error('refresh failed:', err.message);
+        logError('auth refresh', err);
         clearAuthCookies(res);
         res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
@@ -156,6 +164,21 @@ router.post('/refresh', async (req, res) => {
 router.post('/logout', async (req, res) => {
     const token = req.cookies?.refreshToken;
     if (token) await logout(token);
+    const accessToken = req.cookies?.accessToken
+        ?? (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+    if (accessToken) {
+        try {
+            const payload = jwt.verify(accessToken, ACCESS_TOKEN_SECRET);
+            await logActivity({
+                action: 'USER_LOGOUT',
+                entityType: 'USER',
+                entityId: payload.sub,
+                performedById: payload.sub,
+            });
+        } catch {
+            // Expired access tokens cannot be associated with a user.
+        }
+    }
     clearAuthCookies(res);
     res.status(204).end();
 });
