@@ -66,3 +66,11 @@ export async function createHousekeepingRoomType(roomType) {
     });
     return readResponse(response, "Could not create room type.");
 }
+
+export async function updateHousekeepingRoomType(roomTypeId, updates) {
+    const response = await apiFetch(`/rooms/types/${encodeURIComponent(roomTypeId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(updates),
+    });
+    return readResponse(response, "Could not update room type.");
+}

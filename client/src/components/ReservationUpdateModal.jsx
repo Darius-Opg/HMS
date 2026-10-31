@@ -55,11 +55,31 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
     const guestName = [reservation?.guest?.firstName, reservation?.guest?.lastName]
         .filter(Boolean)
         .join(" ");
-    const balance = new Intl.NumberFormat("en-KE", {
+    const formatCurrency = new Intl.NumberFormat("en-KE", {
         style: "currency",
         currency: "KES",
         minimumFractionDigits: 2,
-    }).format(Number(reservation?.balance ?? 0));
+    });
+    const checkOutTimestamp = new Date(checkOutTime).getTime();
+    const checkInTimestamp = new Date(reservation?.checkInDate).getTime();
+    const hourlyRate = Number(reservation?.rateAtBooking ?? 0);
+    const canEstimate = Number.isFinite(checkOutTimestamp)
+        && Number.isFinite(checkInTimestamp)
+        && checkOutTimestamp > checkInTimestamp
+        && Number.isFinite(hourlyRate);
+    const stayTotal = canEstimate
+        ? Math.round(hourlyRate * ((checkOutTimestamp - checkInTimestamp) / 3_600_000) * 100) / 100
+        : 0;
+    const overdueMinutes = canEstimate && checkOutTimestamp < Date.now()
+        ? Math.floor((Date.now() - checkOutTimestamp) / 60_000)
+        : 0;
+    const overdueCharge = overdueMinutes > 60
+        ? Math.round((hourlyRate * overdueMinutes / 60) * 100) / 100
+        : 0;
+    const estimatedBalance = canEstimate
+        ? Math.max(Math.round((stayTotal + overdueCharge - Number(reservation?.invoice?.amountPaid ?? 0)) * 100) / 100, 0)
+        : Number(reservation?.balance ?? 0);
+    const balance = formatCurrency.format(estimatedBalance);
 
     async function handleSubmit(event) {
         event.preventDefault();
@@ -105,7 +125,7 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
                         size={20}
                     />
                     <div>
-                        <p className="app-accent-label">Current Balance</p>
+                        <p className="app-accent-label">Amount due after update</p>
                         <p className="mt-0.5 text-sm font-semibold">{balance}</p>
                     </div>
                 </div>

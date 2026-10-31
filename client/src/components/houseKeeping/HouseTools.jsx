@@ -6,6 +6,7 @@ export default function HouseTools({
     onFiltersChange,
     onNewRoom,
     onNewRoomType,
+    onEditRoomType,
 }) {
     function updateFilter(event) {
         onFiltersChange?.({
@@ -43,6 +44,17 @@ export default function HouseTools({
                     </button>
                 </div>
             </div>
+
+            {roomTypes.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-b border-[#AB784D]/25 px-4 py-3 dark:border-[#B38A5E]/25 sm:px-5">
+                    <span className="app-muted-text mr-1 text-xs">Room types:</span>
+                    {roomTypes.map((type) => (
+                        <button key={type.id} type="button" onClick={() => onEditRoomType?.(type)} aria-label={`Edit room type ${type.name}`} className="app-button min-h-8 px-2.5 py-1 text-xs">
+                            {type.name}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-2.5 bg-[#F9F6F2]/50 p-3 dark:bg-[#0A0A0A]/20 sm:grid-cols-2 sm:p-4 xl:grid-cols-3">
                 <label className="app-input flex min-w-0 items-center gap-2">

@@ -1,4 +1,16 @@
 import { useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { z } from "zod";
+
+const roomFeaturesSchema = z.array(z.string().trim().min(1));
+
+function toFeatureInputs(features) {
+    if (Array.isArray(features)) return features.map((feature) => typeof feature === "string" ? feature : JSON.stringify(feature));
+    if (features && typeof features === "object") {
+        return Object.entries(features).map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`);
+    }
+    return [""];
+}
 
 function Field({ label, htmlFor, children }) {
     return (
@@ -14,9 +26,7 @@ export default function RoomForm({ room, roomTypes = [], onClose, onSave }) {
     const [roomTypeId, setRoomTypeId] = useState(room?.roomTypeId ?? "");
     const [floor, setFloor] = useState(room?.floor ?? "");
     const [roomColor, setRoomColor] = useState(room?.roomColor ?? room?.color ?? "");
-    const [features, setFeatures] = useState(
-        room?.features == null ? "{}" : JSON.stringify(room.features, null, 2),
-    );
+    const [features, setFeatures] = useState(toFeatureInputs(room?.features));
     const [error, setError] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const selectedType = roomTypes.find((type) => type.id === roomTypeId);
@@ -25,15 +35,9 @@ export default function RoomForm({ room, roomTypes = [], onClose, onSave }) {
         event.preventDefault();
         setError("");
 
-        let parsedFeatures;
-        try {
-            parsedFeatures = features.trim() ? JSON.parse(features) : {};
-        } catch {
-            setError("Features must be valid JSON.");
-            return;
-        }
-        if (!parsedFeatures || typeof parsedFeatures !== "object") {
-            setError("Features must be a JSON object or array.");
+        const parsedFeatures = roomFeaturesSchema.safeParse(features.map((feature) => feature.trim()).filter(Boolean));
+        if (!parsedFeatures.success) {
+            setError(parsedFeatures.error.issues[0]?.message ?? "Check the room features.");
             return;
         }
 
@@ -45,7 +49,7 @@ export default function RoomForm({ room, roomTypes = [], onClose, onSave }) {
                 floor: floor === "" ? null : Number(floor),
                 roomColor: roomColor.trim() || null,
                 color: roomColor.trim() || null,
-                features: parsedFeatures,
+                features: parsedFeatures.data,
             });
             onClose();
         } catch (saveError) {
@@ -121,16 +125,39 @@ export default function RoomForm({ room, roomTypes = [], onClose, onSave }) {
                         className="app-input h-10 w-full"
                     />
                 </Field>
-                <Field label="Features (JSON object or array)" htmlFor="house-room-features">
-                    <textarea
-                        id="house-room-features"
-                        name="features"
-                        rows={5}
-                        value={features}
-                        onChange={(event) => setFeatures(event.target.value)}
-                        className="app-input w-full font-mono text-xs"
-                    />
-                </Field>
+                <div className="flex min-w-0 flex-col gap-2">
+                    <span className="app-accent-label">Features</span>
+                    {features.map((feature, index) => (
+                        <div key={index} className="flex min-w-0 gap-2">
+                            <div className="relative min-w-0 flex-1">
+                                <input
+                                    aria-label={`Feature ${index + 1}`}
+                                    value={feature}
+                                    onChange={(event) => setFeatures((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                                    placeholder="Enter a feature"
+                                    className="app-input h-10 w-full pr-11"
+                                />
+                                <button
+                                    type="button"
+                                    disabled={isSaving}
+                                    aria-label={`Remove feature ${index + 1}`}
+                                    onClick={() => setFeatures((current) => current.length === 1
+                                        ? [""]
+                                        : current.filter((_, itemIndex) => itemIndex !== index))}
+                                    className="app-muted-text absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center hover:text-red-600 dark:hover:text-red-400"
+                                >
+                                    <Trash2 aria-hidden="true" size={16} />
+                                </button>
+                            </div>
+                            {index === features.length - 1 && (
+                                <button type="button" disabled={isSaving} onClick={() => setFeatures((current) => [...current, ""])} className="app-button inline-flex shrink-0 items-center gap-1.5">
+                                    <Plus aria-hidden="true" size={15} />
+                                    Feature
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
             </fieldset>
 
             {error && <p role="alert" className="app-error">{error}</p>}

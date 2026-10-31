@@ -10,6 +10,7 @@ import {
     listHousekeepingRooms,
     listHousekeepingRoomTypes,
     setHousekeepingRoomStatus,
+    updateHousekeepingRoomType,
     updateHousekeepingRoom,
 } from "../lib/houseApi";
 
@@ -20,6 +21,7 @@ export default function HouseKeeping() {
     const [selectedRoom, setSelectedRoom] = useState(null);
     const [isRoomFormOpen, setIsRoomFormOpen] = useState(false);
     const [isRoomTypeFormOpen, setIsRoomTypeFormOpen] = useState(false);
+    const [selectedRoomType, setSelectedRoomType] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
     const [notice, setNotice] = useState("");
@@ -94,10 +96,30 @@ export default function HouseKeeping() {
     }
 
     async function saveRoomType(roomType) {
-        await createHousekeepingRoomType(roomType);
-        setNotice(`Room type ${roomType.name} created.`);
+        if (selectedRoomType?.id) {
+            await updateHousekeepingRoomType(selectedRoomType.id, roomType);
+            setNotice(`Room type ${roomType.name} updated.`);
+        } else {
+            await createHousekeepingRoomType(roomType);
+            setNotice(`Room type ${roomType.name} created.`);
+        }
         setIsRoomTypeFormOpen(false);
+        setSelectedRoomType(null);
         reload();
+    }
+
+    function startCreateRoomType() {
+        setSelectedRoomType(null);
+        setIsRoomTypeFormOpen(true);
+        setError("");
+        setNotice("");
+    }
+
+    function startEditRoomType(roomType) {
+        setSelectedRoomType(roomType);
+        setIsRoomTypeFormOpen(true);
+        setError("");
+        setNotice("");
     }
 
     async function removeRoom(room) {
@@ -136,11 +158,8 @@ export default function HouseKeeping() {
                     roomTypes={roomTypes}
                     onFiltersChange={setFilters}
                     onNewRoom={startCreateRoom}
-                    onNewRoomType={() => {
-                        setIsRoomTypeFormOpen(true);
-                        setError("");
-                        setNotice("");
-                    }}
+                    onNewRoomType={startCreateRoomType}
+                    onEditRoomType={startEditRoomType}
                 />
 
                 {error && (
@@ -197,9 +216,14 @@ export default function HouseKeeping() {
             {isRoomTypeFormOpen && (
                 <div className="app-modal-overlay z-[60]">
                     <div role="dialog" aria-modal="true" aria-labelledby="room-type-dialog-title" className="w-full max-w-xl">
-                        <h2 id="room-type-dialog-title" className="sr-only">Create room type</h2>
+                        <h2 id="room-type-dialog-title" className="sr-only">{selectedRoomType ? "Edit room type" : "Create room type"}</h2>
                         <RoomTypeForm
-                            onClose={() => setIsRoomTypeFormOpen(false)}
+                            key={selectedRoomType?.id ?? "new-room-type"}
+                            roomType={selectedRoomType}
+                            onClose={() => {
+                                setIsRoomTypeFormOpen(false);
+                                setSelectedRoomType(null);
+                            }}
                             onSave={saveRoomType}
                         />
                     </div>

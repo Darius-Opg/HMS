@@ -127,16 +127,13 @@ router.patch('/update', handle(async (req, res) => {
         }
 
         const outstandingBalance = Math.round((totalDue - currentAmountPaid) * 100) / 100;
-        if (paymentType === 'FULL' && outstandingBalance > 0) {
-            throw httpError(400, 'A reservation with an outstanding balance cannot be updated as fully paid');
-        }
         if (paymentType === 'PARTIAL' && paidAmount > outstandingBalance) {
             throw httpError(400, 'Payment cannot exceed the outstanding balance');
         }
 
         const amountPaid = paymentType === 'PARTIAL'
             ? Math.round((currentAmountPaid + paidAmount) * 100) / 100
-            : currentAmountPaid;
+            : totalDue;
         const paymentStatus = amountPaid >= totalDue
             ? 'PAID'
             : amountPaid > 0 ? 'PARTIAL' : 'PENDING';
@@ -246,6 +243,55 @@ router.patch('/checkout', handle(async (req, res) => {
     res.json(checkedOut);
 }));
 
+router.patch('/cancel', handle(async (req, res) => {
+    const { reservationId } = req.body ?? {};
+    assertUuid(reservationId, 'reservationId');
+
+    const cancelled = await prisma.$transaction(async (transaction) => {
+        const reservation = await transaction.reservation.findUnique({
+            where: { id: reservationId },
+            select: {
+                id: true,
+                roomId: true,
+                status: true,
+                room: { select: { status: true } },
+            },
+        });
+        if (!reservation) throw httpError(404, 'Reservation not found');
+        if (reservation.status !== ReservationStatus.BOOKED) {
+            throw httpError(409, 'Only booked reservations can be cancelled');
+        }
+        if (reservation.room.status !== 'RESERVED') {
+            throw httpError(409, 'Only reservations for reserved rooms can be cancelled');
+        }
+
+        const reservationUpdate = await transaction.reservation.updateMany({
+            where: { id: reservationId, status: ReservationStatus.BOOKED },
+            data: { status: ReservationStatus.CANCELLED },
+        });
+        if (reservationUpdate.count !== 1) {
+            throw httpError(409, 'Reservation is no longer available for cancellation');
+        }
+
+        const roomUpdate = await transaction.room.updateMany({
+            where: { id: reservation.roomId, status: 'RESERVED' },
+            data: { status: 'AVAILABLE' },
+        });
+        if (roomUpdate.count !== 1) {
+            throw httpError(409, 'Room is no longer available for cancellation');
+        }
+
+        return transaction.reservation.findUnique({
+            where: { id: reservationId },
+            include: {
+                room: { select: { roomNumber: true, status: true } },
+            },
+        });
+    });
+
+    res.json(cancelled);
+}));
+
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 200;
@@ -290,6 +336,7 @@ router.get('/', handle(async (req, res) => {
                 room: {
                     select: {
                         roomNumber: true,
+                        status: true,
                         roomType: { select: { name: true } },
                     },
                 },

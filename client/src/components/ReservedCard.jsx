@@ -14,6 +14,7 @@ import {
 export default function GuestReservationCard({
     guestName,
     roomNumber,
+    roomStatus,
     paymentStatus,
     isOverdue,
     amountPaid,
@@ -24,6 +25,7 @@ export default function GuestReservationCard({
     onUpdate,
     onCheckIn,
     onCheckOut,
+    onCancel,
 }) {
     const [currentTime, setCurrentTime] = useState(() => Date.now());
 
@@ -166,7 +168,7 @@ export default function GuestReservationCard({
             </div>
 
             {/* Balance and actions */}
-            <div className="flex flex-col gap-5 border-t border-[#AB784D]/25 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div className="flex flex-col gap-5 border-t border-[#AB784D]/25 p-5 sm:p-6">
                 <div className="flex min-w-0 items-center gap-4">
                     <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-[#D4AF7A]/15 text-[#AB784D] dark:text-[#D4AF7A]">
                         <Coins size={28} />
@@ -180,24 +182,31 @@ export default function GuestReservationCard({
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex w-full flex-col gap-3 sm:flex-row">
                     {reservationStatus === "BOOKED" && (
                         <Button
                             text="Check In"
                             onClick={onCheckIn}
-                            className="w-full sm:w-auto text-sm "
+                            className="w-full flex-1 text-sm"
                         />
                     )}
                     <Button
                         text="Update"
                         onClick={onUpdate}
-                        className="w-full sm:w-auto text-sm"
+                        className="w-full flex-1 text-sm"
                     />
                     <Button
                         text="Check Out"
                         onClick={onCheckOut}
-                        className="w-full sm:w-auto text-sm"
+                        className="w-full flex-1 text-sm"
                     />
+                    {reservationStatus === "BOOKED" && roomStatus === "RESERVED" && (
+                        <Button
+                            text="Cancel Reservation"
+                            onClick={onCancel}
+                            className="w-full flex-1 text-sm"
+                        />
+                    )}
                 </div>
             </div>
         </article>

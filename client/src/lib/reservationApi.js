@@ -40,3 +40,11 @@ export async function confirmCheckOut({ reservationId }) {
     });
     return parseResponse(response, "Failed to check out");
 }
+
+export async function cancelReservation({ reservationId }) {
+    const response = await apiFetch("/reservations/cancel", {
+        method: "PATCH",
+        body: JSON.stringify({ reservationId }),
+    });
+    return parseResponse(response, "Failed to cancel reservation");
+}

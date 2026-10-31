@@ -4,6 +4,7 @@ import GuestReservationCard from "../components/ReservedCard";
 import ReservationToolBar from "../components/ReservationToolBar";
 import {
     adjustReservationDetails,
+    cancelReservation,
     checkInReservation,
     confirmCheckOut,
     getReservations,
@@ -92,6 +93,28 @@ export default function ReservationsPage() {
         }
     }
 
+    async function handleCancelReservation(reservation) {
+        const guestName = getGuestName(reservation.guest) || "this guest";
+        const roomNumber = reservation.room?.roomNumber ?? "this room";
+        if (!window.confirm(`Cancel the reservation for ${guestName} in ${roomNumber}?`)) {
+            return;
+        }
+
+        setError("");
+        try {
+            await cancelReservation({ reservationId: reservation.id });
+        } catch (cancelError) {
+            setError(cancelError instanceof Error ? cancelError.message : "Failed to cancel reservation");
+            return;
+        }
+
+        try {
+            await reloadReservations();
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : "Failed to refresh reservations");
+        }
+    }
+
     const rooms = useMemo(() => (
         [...new Set(reservations.map(({ room }) => room?.roomType?.name).filter(Boolean))]
             .sort((left, right) => left.localeCompare(right))
@@ -149,6 +172,7 @@ export default function ReservationsPage() {
                                     key={reservation.id}
                                     guestName={getGuestName(reservation.guest)}
                                     roomNumber={reservation.room?.roomNumber}
+                                    roomStatus={reservation.room?.status}
                                     paymentStatus={reservation.invoice?.paymentStatus}
                                     amountPaid={reservation.invoice?.amountPaid}
                                     isOverdue={
@@ -163,6 +187,7 @@ export default function ReservationsPage() {
                                     onUpdate={() => setReservationToUpdate(reservation)}
                                     onCheckIn={() => handleCheckIn(reservation)}
                                     onCheckOut={() => setCheckOutUpdate(reservation)}
+                                    onCancel={() => handleCancelReservation(reservation)}
                                     extraTimeStayedMinutes={reservation.extraTimeStayedMinutes}
                                 />
                             ))}
