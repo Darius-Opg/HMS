@@ -124,6 +124,59 @@ export async function logout(rawRefreshToken) {
 
 export const router = express.Router();
 
+router.post('/reset-password', async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!token || password.length < 8) {
+        return res.status(400).json({ error: 'A reset token and a password of at least 8 characters are required' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const now = new Date();
+    try {
+        const resetRecord = await prisma.passwordResetToken.findUnique({
+            where: { tokenHash },
+            select: { id: true, userId: true, expiresAt: true, usedAt: true },
+        });
+        if (!resetRecord || resetRecord.usedAt || resetRecord.expiresAt <= now) {
+            return res.status(400).json({ error: 'This password reset link is invalid or has expired' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+        await prisma.$transaction(async (transaction) => {
+            const claim = await transaction.passwordResetToken.updateMany({
+                where: { id: resetRecord.id, usedAt: null, expiresAt: { gt: now } },
+                data: { usedAt: now },
+            });
+            if (claim.count !== 1) throw new Error('This password reset link is invalid or has expired');
+
+            const user = await transaction.user.findUnique({
+                where: { id: resetRecord.userId },
+                select: { id: true, isActive: true, isDelete: true },
+            });
+            if (!user || !user.isActive || user.isDelete) throw new Error('This account cannot reset its password');
+
+            await transaction.user.update({ where: { id: user.id }, data: { password: passwordHash } });
+            await transaction.refreshToken.updateMany({
+                where: { userId: user.id, revokedAt: null },
+                data: { revokedAt: now },
+            });
+            await transaction.passwordResetToken.deleteMany({ where: { userId: user.id } });
+        });
+
+        await logActivity({
+            action: 'USER_PASSWORD_RESET',
+            entityType: 'USER',
+            entityId: resetRecord.userId,
+            performedById: resetRecord.userId,
+        });
+        res.json({ message: 'Password updated. You can now sign in with your new password.' });
+    } catch (error) {
+        logError('password reset', error);
+        res.status(400).json({ error: 'Could not reset password. The link may have expired.' });
+    }
+});
+
 router.post('/login', authLimiter, async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {

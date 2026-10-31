@@ -8,6 +8,7 @@ import {
     deactivateUser as deactivateUserRequest,
     deleteUser as deleteUserRequest,
     listUsers,
+    sendPasswordResetLink,
     updateUser,
 } from "../lib/usersApi";
 import {
@@ -46,6 +47,8 @@ export default function UsersPage() {
     const [selectedUserAction, setSelectedUserAction] = useState(null);
     const [actionError, setActionError] = useState("");
     const [isActionSubmitting, setIsActionSubmitting] = useState(false);
+    const [passwordResetMessage, setPasswordResetMessage] = useState("");
+    const [passwordResetError, setPasswordResetError] = useState("");
 
     useEffect(() => {
         let cancelled = false;
@@ -148,8 +151,15 @@ export default function UsersPage() {
         if (succeeded) setSelectedUserAction(null);
     }
 
-    function resetPassword() {
-        setError("Password reset is not available in the users API yet.");
+    async function resetPassword(user) {
+        setPasswordResetMessage("");
+        setPasswordResetError("");
+        try {
+            const result = await sendPasswordResetLink(user.id);
+            setPasswordResetMessage(result.message || `Password reset link sent to ${user.email}.`);
+        } catch (resetError) {
+            setPasswordResetError(resetError instanceof Error ? resetError.message : "Could not send password reset link.");
+        }
     }
 
     const filteredUsers = users.filter((user) => userMatchesFilters(user, filters));
@@ -162,6 +172,9 @@ export default function UsersPage() {
                     initialFilters={EMPTY_FILTERS}
                     onNewUser={() => setIsNewUserOpen(true)}
                 />
+
+                {passwordResetMessage && <p className="app-card p-3 text-sm text-emerald-800 dark:text-emerald-200" role="status">{passwordResetMessage}</p>}
+                {passwordResetError && <p className="app-error" role="alert">{passwordResetError}</p>}
 
                 {isNewUserOpen && (
                     <ReservationModal

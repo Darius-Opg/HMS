@@ -1,9 +1,11 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import bcrypt from "bcrypt";
 import prisma from "../database/index.js";
 import { decrypt, encrypt, hash } from "../security/index.js";
 import { requireAuth, requirePermission } from "../auth/access.js";
 import { logActivity, logError } from "../audit/logActivity.js";
+import { sendPasswordResetEmail } from "../email/mailer.js";
 
 const SALT_ROUNDS = 12;
 
@@ -175,6 +177,49 @@ router.post('/', async (req, res) => {
     } catch (err) {
         logError('user create', err);
         res.status(400).json({ error: 'Could not create user', detail: err.message });
+    }
+});
+
+router.post('/:id/reset-password', async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: req.params.id },
+            select: { id: true, name: true, email: true, isActive: true, isDelete: true },
+        });
+        if (!user || user.isDelete) return res.status(404).json({ error: 'User not found' });
+        if (!user.isActive) return res.status(409).json({ error: 'Cannot reset the password for an inactive user' });
+        if (!user.email) return res.status(409).json({ error: 'This user does not have an email address' });
+
+        const token = crypto.randomBytes(32).toString('base64url');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const ttlMinutes = Number(process.env.PASSWORD_RESET_TTL_MINUTES || 60);
+        if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1) {
+            return res.status(500).json({ error: 'Password reset expiry is not configured correctly' });
+        }
+        const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+
+        await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+        await prisma.passwordResetToken.create({ data: { tokenHash, userId: user.id, expiresAt } });
+
+        try {
+            const resetUrl = new URL(process.env.PASSWORD_RESET_URL || `${process.env.CLIENT_URL}/reset-password`);
+            resetUrl.searchParams.set('token', token);
+            await sendPasswordResetEmail({ to: user.email, name: user.name, resetUrl: resetUrl.toString() });
+        } catch (error) {
+            await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+            throw error;
+        }
+
+        await logActivity({
+            action: 'USER_PASSWORD_RESET_EMAIL_SENT',
+            entityType: 'USER',
+            entityId: user.id,
+            performedById: req.user.id,
+        });
+        res.json({ message: `Password reset link sent to ${user.email}` });
+    } catch (error) {
+        logError('password reset email', error);
+        res.status(500).json({ error: 'Could not send password reset email. Check the SMTP configuration.' });
     }
 });
 

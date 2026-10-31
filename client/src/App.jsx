@@ -13,6 +13,7 @@ import UsersPage from './pages/UsersPage';
 import GuestPage from './pages/GuestPage';
 import StaffGuestPage from './pages/StaffGuestPage';
 import HouseKeeping from './pages/HouseKeeping';
+import ResetPassword from './pages/ResetPassword';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />

@@ -59,3 +59,18 @@ export async function updateUser(userId, updates) {
     });
     return readResponse(response, "Could not update user.");
 }
+
+export async function sendPasswordResetLink(userId) {
+    const response = await apiFetch(`/users/${encodeURIComponent(userId)}/reset-password`, {
+        method: "POST",
+    });
+    return readResponse(response, "Could not send password reset link.");
+}
+
+export async function resetPasswordWithToken({ token, password }) {
+    const response = await apiFetch("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token, password }),
+    });
+    return readResponse(response, "Could not reset password.");
+}
