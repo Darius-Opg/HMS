@@ -33,7 +33,7 @@ export default function RoomCard({
     }
 
     return (
-        <div className="app-card relative m-4 grid grid-cols-[90%_10%] gap-4 p-6">
+        <div className="app-card relative m-1 min-h-[30vh] grid grid-cols-[90%_10%] gap-2 p-6">
             <div>
                 <h1 className="text-lg font-bold uppercase text-gray-900 dark:text-white">
                     {roomName}

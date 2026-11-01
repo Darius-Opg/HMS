@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { BedDouble, CircleAlert, Coins, UserRound, X } from "lucide-react";
 
-export default function ReservationModal({ onClose, children, title = "Reservation details" }) {
+export default function ReservationModal({ onClose, children, title = "Reservation details", size = "default" }) {
     useEffect(() => {
         function handleKeyDown(event) {
             if (event.key === "Escape") onClose();
@@ -17,7 +17,7 @@ export default function ReservationModal({ onClose, children, title = "Reservati
 
         >
             <div
-                className="app-modal relative my-auto mt-8 w-full max-w-2xl max-h-[calc(100dvh-3.5rem)] overflow-y-auto overscroll-contain scrollbar-none p-5 sm:mt-10 sm:max-h-[calc(100dvh-4rem)] sm:p-8"
+                className={`app-modal relative my-auto mt-8 w-full ${size === "wide" ? "max-w-7xl min-h-[75dvh]" : "max-w-2xl"} max-h-[calc(100dvh-3.5rem)] overflow-y-auto overscroll-contain scrollbar-none p-5 sm:mt-10 sm:max-h-[calc(100dvh-4rem)] sm:p-8`}
                 role="dialog"
                 aria-modal="true"
                 aria-label={title}
@@ -51,6 +51,13 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
     const [checkOutTime, setCheckOutTime] = useState(() => toLocalDateTimeValue(reservation?.checkOutDate));
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submissionError, setSubmissionError] = useState("");
+    const [currentTime, setCurrentTime] = useState(0);
+    useEffect(() => {
+        const updateCurrentTime = () => setCurrentTime(Date.now());
+        updateCurrentTime();
+        const intervalId = setInterval(updateCurrentTime, 60_000);
+        return () => clearInterval(intervalId);
+    }, []);
     const roomNumber = reservation?.room?.roomNumber;
     const guestName = [reservation?.guest?.firstName, reservation?.guest?.lastName]
         .filter(Boolean)
@@ -70,8 +77,8 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
     const stayTotal = canEstimate
         ? Math.round(hourlyRate * ((checkOutTimestamp - checkInTimestamp) / 3_600_000) * 100) / 100
         : 0;
-    const overdueMinutes = canEstimate && checkOutTimestamp < Date.now()
-        ? Math.floor((Date.now() - checkOutTimestamp) / 60_000)
+    const overdueMinutes = canEstimate && currentTime > checkOutTimestamp
+        ? Math.floor((currentTime - checkOutTimestamp) / 60_000)
         : 0;
     const overdueCharge = overdueMinutes > 60
         ? Math.round((hourlyRate * overdueMinutes / 60) * 100) / 100

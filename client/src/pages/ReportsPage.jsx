@@ -8,10 +8,10 @@ import {
     Download,
     Eye,
     FileText,
-    ShieldCheck,
     Users,
 } from "lucide-react";
 import ReportsTools from "../components/reports/ReportsTools";
+import ReservationModal from "../components/ReservationUpdateModal";
 import {
     generateReport,
     getRecentReports,
@@ -69,11 +69,28 @@ function localDateString(date) {
 }
 
 function initialDateRange() {
+    return monthDateRange(0);
+}
+
+function monthDateRange(monthsAgo, today = new Date()) {
+    const start = new Date(today.getFullYear(), today.getMonth() - monthsAgo, 1);
+    const end = monthsAgo === 0
+        ? today
+        : new Date(start.getFullYear(), start.getMonth() + 1, 0);
+    return { from: localDateString(start), to: localDateString(end) };
+}
+
+function monthPeriodOptions() {
     const today = new Date();
-    return {
-        from: localDateString(new Date(today.getFullYear(), today.getMonth(), 1)),
-        to: localDateString(today),
-    };
+    return Array.from({ length: 10 }, (_, monthsAgo) => {
+        const month = new Date(today.getFullYear(), today.getMonth() - monthsAgo, 1);
+        return {
+            value: String(monthsAgo),
+            label: monthsAgo === 0
+                ? `This month (${new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(month)})`
+                : new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(month),
+        };
+    });
 }
 
 function formatDate(value, options = { day: "numeric", month: "short", year: "numeric" }) {
@@ -86,6 +103,10 @@ function formatDate(value, options = { day: "numeric", month: "short", year: "nu
 
 function formatCurrency(value) {
     return `KSh ${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+function formatAxisCurrency(value) {
+    return `KSh ${Number(value || 0).toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 1 })}`;
 }
 
 function columnValue(key, value) {
@@ -118,31 +139,32 @@ function downloadCsv(report) {
 function TrendChart({ timeline }) {
     const width = 900;
     const height = 270;
-    const left = 48;
-    const right = 18;
+    const left = 56;
+    const right = 115;
     const top = 18;
     const bottom = 38;
     const plotWidth = width - left - right;
     const plotHeight = height - top - bottom;
     const maxReservations = Math.max(1, ...timeline.map((item) => item.reservations));
-    const maxPayments = Math.max(1, ...timeline.map((item) => item.payments));
+    const reservationScale = Math.max(2, Math.ceil(maxReservations / 2) * 2);
+    const paymentScale = Math.max(1, ...timeline.map((item) => item.payments));
     const xFor = (index) => timeline.length <= 1
         ? left + plotWidth / 2
         : left + (plotWidth * index) / (timeline.length - 1);
     const linePoints = timeline.map((item, index) => (
-        `${xFor(index)},${top + plotHeight - (item.payments / maxPayments) * plotHeight}`
+        `${xFor(index)},${top + plotHeight - (item.payments / paymentScale) * plotHeight}`
     )).join(" ");
     const labelStep = Math.max(1, Math.ceil(timeline.length / 6));
 
     return (
-        <div className="w-full overflow-x-auto">
+        <div className="w-full overflow-x-auto scrollbar-none">
             {timeline.length === 0 ? (
                 <p className="app-muted-text p-8 text-center text-sm">No reservations in this date range.</p>
             ) : (
                 <svg
                     viewBox={`0 0 ${width} ${height}`}
                     role="img"
-                    aria-label="Daily reservations and tracked payments"
+                    aria-label="Daily reservations and tracked payments; left scale shows reservations and right scale shows payments in KSh"
                     className="h-64 min-w-[36rem] w-full"
                 >
                     {[0, 0.5, 1].map((fraction) => {
@@ -151,7 +173,10 @@ function TrendChart({ timeline }) {
                             <g key={fraction}>
                                 <line x1={left} x2={width - right} y1={y} y2={y} stroke="currentColor" opacity="0.12" />
                                 <text x={left - 8} y={y + 4} textAnchor="end" fill="currentColor" className="app-muted-text text-[11px]">
-                                    {Math.round(maxReservations * (1 - fraction))}
+                                    {Math.round(reservationScale * (1 - fraction))}
+                                </text>
+                                <text x={width - right + 8} y={y + 4} textAnchor="start" fill="currentColor" className="app-muted-text text-[11px]">
+                                    {formatAxisCurrency(paymentScale * (1 - fraction))}
                                 </text>
                             </g>
                         );
@@ -159,7 +184,7 @@ function TrendChart({ timeline }) {
                     {timeline.map((point, index) => {
                         const slotWidth = plotWidth / Math.max(timeline.length, 1);
                         const barWidth = Math.max(2, Math.min(20, slotWidth * 0.56));
-                        const barHeight = (point.reservations / maxReservations) * plotHeight;
+                        const barHeight = (point.reservations / reservationScale) * plotHeight;
                         return (
                             <g key={point.date}>
                                 <title>{`${formatDate(point.date)}: ${point.reservations} reservations, ${formatCurrency(point.payments)} tracked payments`}</title>
@@ -198,7 +223,7 @@ function TrendChart({ timeline }) {
                         <circle
                             key={`payment-${point.date}`}
                             cx={xFor(index)}
-                            cy={top + plotHeight - (point.payments / maxPayments) * plotHeight}
+                            cy={top + plotHeight - (point.payments / paymentScale) * plotHeight}
                             r="3"
                             fill="#f39513"
                         >
@@ -231,7 +256,7 @@ function StatCard({ icon: Icon, label, value, detail, loading }) {
 function ReportTable({ report }) {
     const columns = reportColumns[report.type] ?? [];
     return (
-        <div className="app-table-container">
+        <div className="app-table-container scrollbar-none">
             <table className="app-table min-w-full">
                 <thead>
                     <tr>{columns.map(([, label]) => <th key={label}>{label}</th>)}</tr>
@@ -257,6 +282,8 @@ function ReportTable({ report }) {
 
 export default function ReportsPage() {
     const [range, setRange] = useState(initialDateRange);
+    const [selectedPeriod, setSelectedPeriod] = useState("0");
+    const [periodOptions] = useState(monthPeriodOptions);
     const [type, setType] = useState("RESERVATIONS");
     const [dashboard, setDashboard] = useState(null);
     const [recentReports, setRecentReports] = useState([]);
@@ -311,7 +338,16 @@ export default function ReportsPage() {
         setIsLoading(true);
         setError("");
         setSelectedReport(null);
+        setSelectedPeriod("custom");
         setRange((current) => ({ ...current, [field]: value }));
+    }
+
+    function changePeriod(value) {
+        setSelectedPeriod(value);
+        setIsLoading(true);
+        setError("");
+        setSelectedReport(null);
+        setRange(monthDateRange(Number(value)));
     }
 
     async function handleGenerate() {
@@ -425,61 +461,65 @@ export default function ReportsPage() {
                     />
                 </section>
 
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-                    <section className="app-card min-w-0 p-4 sm:p-5" aria-labelledby="reservations-overview-heading">
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <section className="app-card min-w-0 p-4 sm:p-5" aria-labelledby="reservations-overview-heading">
+                    <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+                        <div className="flex flex-wrap items-end gap-3">
+                            <label className="flex flex-col gap-1">
+                                <span className="app-accent-label">Viewing month</span>
+                                <select
+                                    value={selectedPeriod}
+                                    onChange={(event) => changePeriod(event.target.value)}
+                                    className="app-input h-10 min-w-52"
+                                    aria-label="Select report month"
+                                >
+                                    {selectedPeriod === "custom" && <option value="custom" disabled>Custom date range</option>}
+                                    {periodOptions.map(({ value, label }) => (
+                                        <option key={value} value={value}>{label}</option>
+                                    ))}
+                                </select>
+                            </label>
                             <h2 id="reservations-overview-heading" className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
                                 <ChartNoAxesCombined size={18} className="text-[#f39513]" aria-hidden="true" />
                                 Reservations overview
                             </h2>
-                            <div className="app-muted-text flex flex-wrap gap-4 text-xs">
-                                <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#D4AF7A]" />Reservations</span>
-                                <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#f39513]" />Tracked payments</span>
-                            </div>
                         </div>
-                        {isLoading
-                            ? <p className="app-muted-text p-8 text-center text-sm" role="status">Loading report data…</p>
-                            : error
-                                ? <p className="app-muted-text p-8 text-center text-sm">Chart unavailable.</p>
-                                : <TrendChart timeline={timeline} />}
-                    </section>
-
-                    <aside className="app-card p-4 sm:p-5" aria-labelledby="report-access-heading">
-                        <h2 id="report-access-heading" className="mb-2 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                            <ShieldCheck size={18} className="text-[#f39513]" aria-hidden="true" />
-                            Your access
-                        </h2>
-                        <p className="app-muted-text mb-3 text-sm">Reports are available to accounts with report access.</p>
-                        <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-200">
-                            {["Reservations report", "Guest report", "Room report", "Payments report"].map((item) => (
-                                <li key={item} className="flex items-center gap-2">
-                                    <ShieldCheck size={15} className="shrink-0 text-[#f39513]" aria-hidden="true" />
-                                    {item}
-                                </li>
-                            ))}
-                        </ul>
-                    </aside>
-                </div>
+                        <div className="app-muted-text flex flex-wrap gap-4 text-xs">
+                            <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#D4AF7A]" />Reservations</span>
+                            <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#f39513]" />Tracked payments</span>
+                        </div>
+                    </div>
+                    {isLoading
+                        ? <p className="app-muted-text p-8 text-center text-sm" role="status">Loading report data…</p>
+                        : error
+                            ? <p className="app-muted-text p-8 text-center text-sm">Chart unavailable.</p>
+                            : <TrendChart timeline={timeline} />}
+                </section>
 
                 {selectedReport && (
-                    <section className="space-y-3" aria-labelledby="generated-report-heading">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                            <div>
-                                <h2 id="generated-report-heading" className="text-lg font-semibold text-gray-900 dark:text-white">
-                                    {reportLabels[selectedReport.type]} report
-                                </h2>
-                                <p className="app-muted-text text-sm">
-                                    {formatDate(selectedReport.period.from)} – {formatDate(selectedReport.period.to)}
-                                    {" · "}{selectedReport.rows.length.toLocaleString()} records
-                                </p>
+                    <ReservationModal
+                        onClose={() => setSelectedReport(null)}
+                        title={`${reportLabels[selectedReport.type]} report`}
+                        size="wide"
+                    >
+                        <section className="space-y-4" aria-labelledby="generated-report-heading">
+                            <div className="flex flex-col gap-2 pr-10 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <h2 id="generated-report-heading" className="text-lg font-semibold text-gray-900 dark:text-white">
+                                        {reportLabels[selectedReport.type]} report
+                                    </h2>
+                                    <p className="app-muted-text text-sm">
+                                        {formatDate(selectedReport.period.from)} – {formatDate(selectedReport.period.to)}
+                                        {" · "}{selectedReport.rows.length.toLocaleString()} records
+                                    </p>
+                                </div>
+                                <button type="button" onClick={() => downloadCsv(selectedReport)} className="app-button inline-flex items-center justify-center gap-2">
+                                    <Download size={15} aria-hidden="true" />
+                                    Download CSV
+                                </button>
                             </div>
-                            <button type="button" onClick={() => downloadCsv(selectedReport)} className="app-button inline-flex items-center justify-center gap-2">
-                                <Download size={15} aria-hidden="true" />
-                                Download CSV
-                            </button>
-                        </div>
-                        <ReportTable report={selectedReport} />
-                    </section>
+                            <ReportTable report={selectedReport} />
+                        </section>
+                    </ReservationModal>
                 )}
 
                 <section className="space-y-3" aria-labelledby="recent-reports-heading">
@@ -495,7 +535,7 @@ export default function ReportsPage() {
                         <p className="app-card app-muted-text p-5 text-sm">No reports have been generated yet.</p>
                     )}
                     {recentReports.length > 0 && (
-                        <div className="app-table-container">
+                        <div className="app-table-container scrollbar-none">
                             <table className="app-table min-w-[48rem]">
                                 <thead>
                                     <tr>

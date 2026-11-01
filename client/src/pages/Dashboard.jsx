@@ -1,4 +1,5 @@
 import RoomCard from '../components/DashboardRoomCard';
+import { useAuth } from '../context/AuthContext';
 import { listRoomTypes } from '../lib/roomApi.js';
 import { useEffect, useState } from 'react';
 
@@ -16,6 +17,7 @@ function toRows(items) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [roomTypes, setRoomTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,7 +32,12 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="app-page app-content-with-sidebar p-6">
+    <div className="app-page app-content-with-sidebar px-6 pb-6 pt-20">
+      <div className="w-full pt-2.5 text-left">
+        <h1 className="app-accent-title text-left text-2xl">Welcome, {user?.name || "there"}!</h1>
+        <p className='app-accent-text'>Here is what is on Trace Lounge Hotel Today</p>
+      </div>
+
       {loading && <p className="app-accent-text p-4 text-sm">Loading room types…</p>}
       {error && <p className="p-4 text-sm text-red-600">{error}</p>}
 

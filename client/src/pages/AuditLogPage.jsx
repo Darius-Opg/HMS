@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { Download, FileClock, Search, ShieldAlert } from "lucide-react";
 import { listAuditLogs } from "../lib/auditLogApi";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 15;
 
 function localDateString(date) {
     const year = date.getFullYear();
@@ -204,8 +204,8 @@ export default function AuditLogPage() {
                             {isLoading ? "Loading activity…" : `Showing ${firstItem}–${lastItem} of ${result.total.toLocaleString()}`}
                         </p>
                     </div>
-                    <div className="app-table-container">
-                        <table className="app-table min-w-[60rem]">
+                    <div className="app-table-container overflow-auto scrollbar-none">
+                        <table className="app-table min-w-[60rem] whitespace-nowrap">
                             <thead>
                                 <tr>
                                     <th>Date</th>
@@ -227,7 +227,7 @@ export default function AuditLogPage() {
                                         <td>{log.entityType || "—"}</td>
                                         <td className="max-w-48 truncate font-mono text-xs" title={log.entityId ?? ""}>{log.entityId || "—"}</td>
                                         <td>{log.performedBy}</td>
-                                        <td className="max-w-sm whitespace-normal text-xs">{describeMetadata(log.metadata)}</td>
+                                        <td className="text-xs">{describeMetadata(log.metadata)}</td>
                                     </tr>
                                 ))}
                                 {!isLoading && !error && result.items.length === 0 && (
