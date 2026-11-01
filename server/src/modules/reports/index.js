@@ -68,7 +68,7 @@ async function buildDashboard(range) {
     const [reservations, guests, payments, totalRooms, occupiedRooms] = await Promise.all([
         prisma.reservation.findMany({
             where: { checkInDate: period },
-            select: { checkInDate: true },
+            select: { checkInDate: true, status: true },
         }),
         prisma.guest.count({ where: { createdAt: period } }),
         prisma.invoice.findMany({
@@ -80,11 +80,18 @@ async function buildDashboard(range) {
     ]);
 
     const daily = new Map();
+    const reservationStatuses = {
+        BOOKED: 0,
+        CHECKED_IN: 0,
+        CHECKED_OUT: 0,
+        CANCELLED: 0,
+    };
     for (let date = range.start; date < range.endExclusive; date = new Date(date.getTime() + DAY_IN_MS)) {
         daily.set(date.toISOString().slice(0, 10), { date: date.toISOString().slice(0, 10), reservations: 0, payments: 0 });
     }
 
     for (const reservation of reservations) {
+        reservationStatuses[reservation.status] += 1;
         const key = reservation.checkInDate.toISOString().slice(0, 10);
         const point = daily.get(key);
         if (point) point.reservations += 1;
@@ -103,6 +110,7 @@ async function buildDashboard(range) {
             totalRevenue: payments.reduce((total, payment) => total + Number(payment.amountPaid), 0),
             occupancyRate: totalRooms === 0 ? 0 : Math.round((occupiedRooms / totalRooms) * 100),
         },
+        reservationStatuses,
         timeline: [...daily.values()],
     };
 }
