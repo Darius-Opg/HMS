@@ -13,6 +13,7 @@ export async function listGuests(req, res, { includePrivateDetails = true } = {}
 
     const [guests, total] = await Promise.all([
         prisma.guest.findMany({
+            where: { isDelete: false },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             skip: (page - 1) * limit,
             take: limit,
@@ -50,7 +51,7 @@ export async function listGuests(req, res, { includePrivateDetails = true } = {}
                 },
             },
         }),
-        prisma.guest.count(),
+        prisma.guest.count({ where: { isDelete: false } }),
     ]);
 
     res.set("X-Total-Count", String(total));

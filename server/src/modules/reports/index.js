@@ -65,18 +65,21 @@ function parseReportType(value) {
 
 async function buildDashboard(range) {
     const period = { gte: range.start, lt: range.endExclusive };
-    const [reservations, guests, payments, totalRooms, occupiedRooms] = await Promise.all([
+    const [reservations, occupancyReservations, guests, payments, availableRooms] = await Promise.all([
         prisma.reservation.findMany({
             where: { checkInDate: period },
             select: { checkInDate: true, status: true },
         }),
-        prisma.guest.count({ where: { createdAt: period } }),
-        prisma.invoice.findMany({
-            where: { updatedAt: period },
-            select: { updatedAt: true, amountPaid: true },
+        prisma.reservation.findMany({
+            where: { status: { not: 'CANCELLED' }, checkInDate: { lt: range.endExclusive }, checkOutDate: { gt: range.start } },
+            select: { checkInDate: true, checkOutDate: true },
         }),
-        prisma.room.count(),
-        prisma.room.count({ where: { status: 'OCCUPIED' } }),
+        prisma.guest.count({ where: { createdAt: period, isDelete: false } }),
+        prisma.invoice.findMany({
+            where: { updatedAt: period, reservation: { status: { not: 'CANCELLED' } } },
+            select: { updatedAt: true, totalAmount: true, amountPaid: true },
+        }),
+        prisma.room.count({ where: { status: { not: 'MAINTENANCE' } } }),
     ]);
 
     const daily = new Map();
@@ -102,13 +105,27 @@ async function buildDashboard(range) {
         if (point) point.payments += Number(payment.amountPaid);
     }
 
+    const rangeNights = (range.endExclusive.getTime() - range.start.getTime()) / DAY_IN_MS;
+    const occupiedRoomNights = occupancyReservations.reduce((total, reservation) => {
+        const start = Math.max(reservation.checkInDate.getTime(), range.start.getTime());
+        const end = Math.min(reservation.checkOutDate.getTime(), range.endExclusive.getTime());
+        return total + Math.max(0, (end - start) / DAY_IN_MS);
+    }, 0);
+    const availableRoomNights = availableRooms * rangeNights;
+    const revenuePaid = payments.reduce((total, payment) => total + Number(payment.amountPaid), 0);
+    const revenueOutstanding = payments.reduce((total, payment) => total + Math.max(Number(payment.totalAmount) - Number(payment.amountPaid), 0), 0);
+
     return {
         period: { from: range.from, to: range.to },
         summary: {
             totalReservations: reservations.length,
             totalGuests: guests,
-            totalRevenue: payments.reduce((total, payment) => total + Number(payment.amountPaid), 0),
-            occupancyRate: totalRooms === 0 ? 0 : Math.round((occupiedRooms / totalRooms) * 100),
+            totalRevenue: revenuePaid,
+            revenuePaid,
+            revenueOutstanding,
+            occupiedRoomNights,
+            availableRoomNights,
+            occupancyRate: availableRoomNights === 0 ? 0 : Math.round((occupiedRoomNights / availableRoomNights) * 10000) / 100,
         },
         reservationStatuses,
         timeline: [...daily.values()],
@@ -143,7 +160,7 @@ async function buildReport(type, range) {
         }
         case 'GUESTS': {
             const rows = await prisma.guest.findMany({
-                where: { createdAt: period },
+                where: { createdAt: period, isDelete: false },
                 orderBy: { createdAt: 'desc' },
                 include: { _count: { select: { reservations: true } } },
             });
@@ -171,7 +188,7 @@ async function buildReport(type, range) {
         }
         case 'PAYMENTS': {
             const rows = await prisma.invoice.findMany({
-                where: { updatedAt: period },
+                where: { updatedAt: period, reservation: { status: { not: 'CANCELLED' } } },
                 orderBy: { updatedAt: 'desc' },
                 include: {
                     reservation: {

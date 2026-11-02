@@ -85,12 +85,23 @@ export async function refresh(rawRefreshToken) {
 
     if (!stored || stored.expiresAt < new Date() || stored.revokedAt) {
         if (stored?.revokedAt) {
-            const { count } = await prisma.refreshToken.updateMany({
-                where: { id: stored.id, revokedAt: null },
+            await prisma.refreshToken.updateMany({
+                where: { userId: stored.userId, revokedAt: null },
                 data: { revokedAt: new Date() },
             });
-            if (count === 0) throw new Error('Invalid refresh token');
         }
+        throw new Error('Invalid refresh token');
+    }
+
+    const account = await prisma.user.findUnique({
+        where: { id: stored.userId },
+        select: { id: true, isActive: true, isDelete: true },
+    });
+    if (!account || !account.isActive || account.isDelete) {
+        await prisma.refreshToken.updateMany({
+            where: { userId: stored.userId, revokedAt: null },
+            data: { revokedAt: new Date() },
+        });
         throw new Error('Invalid refresh token');
     }
 

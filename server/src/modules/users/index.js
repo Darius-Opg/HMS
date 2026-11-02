@@ -6,6 +6,7 @@ import { decrypt, encrypt, hash } from "../security/index.js";
 import { requireAuth, requirePermission } from "../auth/access.js";
 import { logActivity, logError } from "../audit/logActivity.js";
 import { sendPasswordResetEmail } from "../email/mailer.js";
+import { assertUuid } from '../rooms/roomHelper.js';
 
 const SALT_ROUNDS = 12;
 
@@ -22,7 +23,7 @@ const DEFAULT_PERMISSIONS = {
     STAFF: [
         'MANAGE_RESERVATIONS',
         'MANAGE_GUESTS',
-        'MANAGE_ROOMS'
+        'MANAGE_BILLING',
     ]
 }
 
@@ -64,7 +65,7 @@ export async function findByEmailForAuth(email) {
     }
 }
 
-export async function listUsers() {
+export async function listUsers({ includeSensitive = false } = {}) {
     const users = await prisma.user.findMany({
         where: { isDelete: false },
         orderBy: { createdAt: 'desc' },
@@ -81,11 +82,11 @@ export async function listUsers() {
         },
     });
 
-    return users.map(({ phoneEncrypted, idNumberEncrypted, ...user }) => ({
+    return users.map(({ phoneEncrypted, idNumberEncrypted, ...user }) => includeSensitive ? ({
         ...user,
         phone: decrypt(phoneEncrypted),
         idNumber: decrypt(idNumberEncrypted),
-    }));
+    }) : user);
 }
 
 export async function updateUser(id, { name, email, role, permissions, phone, idNumber }) {
@@ -133,9 +134,15 @@ export async function softDeleteUser(id, reason) {
 
 export async function getUserById(id) {
     try {
-        return await prisma.user.findUnique({
+        const user = await prisma.user.findUnique({
             where: { id },
+            select: {
+                id: true, name: true, email: true, role: true, permissions: true,
+                createdAt: true, updatedAt: true, isActive: true, deactivatedAt: true,
+                deactivationReason: true, isDelete: true, deletedAt: true, deletionReason: true,
+            },
         });
+        return user;
     }
     catch (error) {
         logError('user lookup', error);
@@ -163,6 +170,10 @@ export async function getUserById(id) {
 export const router = express.Router()
 
 router.use(requireAuth, requirePermission('MANAGE_USERS'));
+router.param('id', (req, res, next, id) => {
+    try { assertUuid(id, 'id'); next(); }
+    catch (error) { res.status(400).json({ error: error.message }); }
+});
 
 router.post('/', async (req, res) => {
     const { name, email, phone, idNumber, password, role, permissions } = req.body;
@@ -173,10 +184,12 @@ router.post('/', async (req, res) => {
     try {
         const user = await createUser({ name, email, phone, idNumber, password, role, permissions });
         await logActivity({ action: 'USER_CREATED', entityType: 'USER', entityId: user.id, performedById: req.user.id, metadata: { role: user.role } });
-        res.status(201).json(user);
+        const { phoneEncrypted, phoneHash, idNumberEncrypted, idNumberHash, ...safeUser } = user;
+        res.status(201).json(safeUser);
     } catch (err) {
         logError('user create', err);
-        res.status(400).json({ error: 'Could not create user', detail: err.message });
+        const status = err.code === 'P2002' ? 409 : 400;
+        res.status(status).json({ error: status === 409 ? 'A user with that unique value already exists' : 'Could not create user' });
     }
 });
 
@@ -224,7 +237,7 @@ router.post('/:id/reset-password', async (req, res) => {
 });
 
 router.get('/', async (req, res) => {
-    res.json(await listUsers());
+    res.json(await listUsers({ includeSensitive: req.query.includeSensitive === 'true' }));
 });
 
 router.get('/:id', async (req, res) => {

@@ -1,3 +1,4 @@
+import { Prisma } from '../../generated/prisma/index.js';
 
 const HOURS_PER_PERIOD_UNIT = {
     hours: 1,
@@ -27,16 +28,23 @@ export function calculateTotalFees(hourlyRate, period, periodUnit) {
         return null;
     }
 
-    const rate = Number(hourlyRate);
-    const duration = Number(period);
+    let rate;
+    let duration;
+    try {
+        rate = new Prisma.Decimal(String(hourlyRate));
+        duration = new Prisma.Decimal(String(period));
+    } catch {
+        return null;
+    }
     const hoursPerUnit = getHoursPerUnit(periodUnit);
 
-    if (!Number.isFinite(rate) || rate < 0
-        || !Number.isFinite(duration) || duration <= 0
+    if (!rate.isFinite() || rate.lt(0)
+        || !duration.isFinite() || duration.lte(0)
         || hoursPerUnit === undefined) {
         return null;
     }
 
-    return Math.round(rate * duration * hoursPerUnit * 100) / 100;
+    return rate.times(duration).times(hoursPerUnit).div(24).toDecimalPlaces(2);
 }
+
 

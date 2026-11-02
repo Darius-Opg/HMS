@@ -9,7 +9,7 @@ async function readResponse(response, fallbackMessage) {
 }
 
 export async function listUsers() {
-    const response = await apiFetch("/users");
+    const response = await apiFetch("/users?includeSensitive=true");
     const users = await readResponse(response, "Could not load users.");
     if (!Array.isArray(users)) {
         throw new Error("The users response was not a list.");

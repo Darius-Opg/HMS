@@ -15,6 +15,7 @@ export function sendError(res, error) {
         return res.status(409).json({ error: 'A record with that unique value already exists' });
     }
     if (error.code === 'P2025') return res.status(404).json({ error: 'Record not found' });
+    if (error.code === 'P2034') return res.status(409).json({ error: 'The record changed concurrently; retry the request' });
     if (error.code === 'P2003') {
         return res.status(400).json({ error: 'Invalid reference, or the record is still in use' });
     }

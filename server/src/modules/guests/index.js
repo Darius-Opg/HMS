@@ -6,6 +6,7 @@ import { decrypt, encrypt, hash } from '../security/index.js';
 import { calculateStayDate, calculateTotalFees } from './rateCalculation.js';
 import { listFrontDeskGuests, listGuests } from './guestList.js';
 import prisma from '../database/index.js';
+import { Prisma } from '../../generated/prisma/index.js';
 import { logActivity } from '../audit/logActivity.js';
 
 export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
@@ -89,25 +90,28 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
         }
 
         const hasPaidAmount = paidAmount !== undefined && paidAmount !== null && paidAmount !== '';
-        const amountPaid = hasPaidAmount ? Number(paidAmount) : totalAmount;
-        if (!Number.isFinite(amountPaid) || amountPaid <= 0 || amountPaid > totalAmount) {
+        let amountPaid;
+        try { amountPaid = hasPaidAmount ? new Prisma.Decimal(String(paidAmount)) : totalAmount; }
+        catch { throw httpError(400, 'paidAmount must be a valid decimal amount'); }
+        if (!amountPaid.isFinite() || amountPaid.lte(0) || amountPaid.gt(totalAmount)) {
             throw httpError(400, 'paidAmount must be greater than 0 and no more than the total fees');
         }
-        const paymentStatus = amountPaid >= totalAmount ? 'PAID' : 'PARTIAL';
+        const paymentStatus = amountPaid.gte(totalAmount) ? 'PAID' : 'PARTIAL';
 
         let guest;
         if (hasRegisteredGuest) {
-            guest = await transaction.guest.findUnique({
-                where: { id: guestId },
+            guest = await transaction.guest.findFirst({
+                where: { id: guestId, isDelete: false },
                 select: { id: true },
             });
             if (!guest) throw httpError(404, 'Guest not found');
         } else {
             const existingGuest = await transaction.guest.findUnique({
                 where: { idNumberHash },
-                select: { id: true },
+                select: { id: true, isDelete: true },
             });
             if (existingGuest) {
+                if (existingGuest.isDelete) throw httpError(409, 'This guest record has been deleted');
                 guest = existingGuest;
             } else {
                 guest = await transaction.guest.create({
@@ -147,7 +151,7 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
                         totalAmount,
                         amountPaid,
                         paymentStatus,
-                        paidAt: new Date(),
+                        paidAt: paymentStatus === 'PAID' ? new Date() : null,
                     },
                 },
             },
@@ -156,7 +160,7 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
                 invoice: true,
             },
         });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     if (createdGuest) {
         await logActivity({
@@ -195,12 +199,91 @@ router.get('/lookup', handle(async (req, res) => {
 
     const guest = await prisma.guest.findUnique({
         where: { idNumberHash: hash(idNumber) },
-        select: { id: true, firstName: true, lastName: true, email: true, phoneEncrypted: true },
+        select: { id: true, firstName: true, lastName: true, email: true, phoneEncrypted: true, isDelete: true },
     });
-    if (!guest) return res.json(null);
+    if (!guest || guest.isDelete) return res.json(null);
 
-    const { phoneEncrypted, ...guestDetails } = guest;
+    const { phoneEncrypted, isDelete, ...guestDetails } = guest;
     res.json({ ...guestDetails, phoneNumber: decrypt(phoneEncrypted) });
+}));
+
+router.delete('/:guestId', handle(async (req, res) => {
+    const { guestId } = req.params;
+    assertUuid(guestId, 'guestId');
+
+    const result = await prisma.guest.updateMany({
+        where: { id: guestId, isDelete: false },
+        data: { isDelete: true, deletedAt: new Date() },
+    });
+    if (result.count === 0) throw httpError(404, 'Guest not found');
+
+    await logActivity({
+        action: 'GUEST_SOFT_DELETED',
+        entityType: 'GUEST',
+        entityId: guestId,
+        performedById: req.user.id,
+    });
+    res.json({ message: 'Guest deleted' });
+}));
+
+router.patch('/:guestId', handle(async (req, res) => {
+    const { guestId } = req.params;
+    assertUuid(guestId, 'guestId');
+    const { firstName, lastName, email, phoneNumber, idNumber } = req.body ?? {};
+    const data = {};
+    for (const field of ['firstName', 'lastName']) {
+        if (req.body?.[field] !== undefined) {
+            if (typeof req.body[field] !== 'string' || !req.body[field].trim()) throw httpError(400, `${field} must be non-empty text`);
+            data[field] = req.body[field].trim();
+        }
+    }
+    if (email !== undefined) {
+        if (email !== null && typeof email !== 'string') throw httpError(400, 'email must be text');
+        data.email = email?.trim() || null;
+    }
+    if (phoneNumber !== undefined) {
+        if (phoneNumber !== null && typeof phoneNumber !== 'string') throw httpError(400, 'phoneNumber must be text');
+        data.phoneEncrypted = phoneNumber ? encrypt(phoneNumber.trim()) : null;
+        data.phoneHash = phoneNumber ? hash(phoneNumber.trim()) : null;
+    }
+    if (idNumber !== undefined) {
+        if (idNumber !== null && typeof idNumber !== 'string') throw httpError(400, 'idNumber must be text');
+        data.idNumberEncrypted = idNumber ? encrypt(idNumber.trim()) : null;
+        data.idNumberHash = idNumber ? hash(idNumber.trim()) : null;
+    }
+    if (!Object.keys(data).length) throw httpError(400, 'At least one guest field must be supplied');
+    const result = await prisma.guest.updateMany({ where: { id: guestId, isDelete: false }, data });
+    if (result.count === 0) throw httpError(404, 'Guest not found');
+    const guest = await prisma.guest.findUnique({ where: { id: guestId } });
+    await logActivity({ action: 'GUEST_UPDATED', entityType: 'GUEST', entityId: guest.id, performedById: req.user.id });
+    res.json(guest);
+}));
+
+router.patch('/:guestId/loyalty-tier', handle(async (req, res) => {
+    const { guestId } = req.params;
+    assertUuid(guestId, 'guestId');
+    const tier = req.body?.loyaltyTier;
+    if (!['STANDARD', 'PREMIUM'].includes(tier)) throw httpError(400, 'loyaltyTier must be STANDARD or PREMIUM');
+    const result = await prisma.guest.updateMany({ where: { id: guestId, isDelete: false }, data: { loyaltyTier: tier } });
+    if (result.count === 0) throw httpError(404, 'Guest not found');
+    const guest = await prisma.guest.findUnique({ where: { id: guestId }, select: { id: true, loyaltyTier: true } });
+    await logActivity({ action: 'GUEST_LOYALTY_TIER_UPDATED', entityType: 'GUEST', entityId: guest.id, performedById: req.user.id, metadata: { loyaltyTier: tier } });
+    res.json(guest);
+}));
+
+router.get('/:guestId/summary', handle(async (req, res) => {
+    const { guestId } = req.params;
+    assertUuid(guestId, 'guestId');
+    const [guest, stays] = await Promise.all([
+        prisma.guest.findFirst({ where: { id: guestId, isDelete: false }, select: { id: true, loyaltyTier: true } }),
+        prisma.reservation.findMany({
+            where: { guestId, status: 'CHECKED_OUT' },
+            select: { invoice: { select: { totalAmount: true } } },
+        }),
+    ]);
+    if (!guest) throw httpError(404, 'Guest not found');
+    const totalSpend = stays.reduce((total, stay) => total.plus(stay.invoice?.totalAmount ?? 0), new Prisma.Decimal(0));
+    res.json({ ...guest, completedStays: stays.length, totalSpend: totalSpend.toFixed(2) });
 }));
 
 router.get('/room-availability', handle(async (req, res) => {

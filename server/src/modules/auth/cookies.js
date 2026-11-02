@@ -5,7 +5,7 @@ const REFRESH_TOKEN_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 7);
 const COOKIE_OPTIONS = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.COOKIE_SAME_SITE || 'lax;'
+    sameSite: process.env.COOKIE_SAME_SITE || 'lax'
 }
 
 export function setAuthCookies(res, accessToken, refreshToken) {
