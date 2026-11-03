@@ -1,7 +1,7 @@
 import express from 'express';
 import { requireAuth, requirePermission } from '../auth/access.js';
 import { handle } from '../rooms/index.js';
-import { assertUuid, httpError, parseDate, withLogging } from '../rooms/roomHelper.js';
+import { assertUuid, httpError, parseDate, reservationOverlapWhere, withLogging } from '../rooms/roomHelper.js';
 import { decrypt, encrypt, hash } from '../security/index.js';
 import { calculateStayDate, calculateTotalFees } from './rateCalculation.js';
 import { listFrontDeskGuests, listGuests } from './guestList.js';
@@ -67,17 +67,12 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
             include: { roomType: true },
         });
         if (!room) throw httpError(404, 'Room not found');
-        if (room.status !== 'AVAILABLE') {
-            throw httpError(409, 'Room is not available');
+        if (room.status === 'MAINTENANCE') {
+            throw httpError(409, 'Room is under maintenance');
         }
 
         const overlappingReservation = await transaction.reservation.findFirst({
-            where: {
-                roomId: room.id,
-                status: { in: ['BOOKED', 'CHECKED_IN'] },
-                checkInDate: { lt: checkOut },
-                checkOutDate: { gt: checkIn },
-            },
+            where: { roomId: room.id, ...reservationOverlapWhere(checkIn, checkOut) },
             select: { id: true },
         });
         if (overlappingReservation) {
@@ -94,7 +89,7 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
         try { amountPaid = hasPaidAmount ? new Prisma.Decimal(String(paidAmount)) : totalAmount; }
         catch { throw httpError(400, 'paidAmount must be a valid decimal amount'); }
         if (!amountPaid.isFinite() || amountPaid.lte(0) || amountPaid.gt(totalAmount)) {
-            throw httpError(400, 'paidAmount must be greater than 0 and no more than the total fees');
+            throw httpError(400, `paidAmount must be greater than 0 and no more than the total fees`);
         }
         const paymentStatus = amountPaid.gte(totalAmount) ? 'PAID' : 'PARTIAL';
 
@@ -130,12 +125,14 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
             }
         }
 
-        const roomUpdate = await transaction.room.updateMany({
-            where: { id: room.id, status: 'AVAILABLE' },
-            data: { status: roomStatus },
-        });
-        if (roomUpdate.count !== 1) {
-            throw httpError(409, 'Room is no longer available');
+        if (room.status === 'AVAILABLE') {
+            const roomUpdate = await transaction.room.updateMany({
+                where: { id: room.id, status: 'AVAILABLE' },
+                data: { status: roomStatus },
+            });
+            if (roomUpdate.count !== 1) {
+                throw httpError(409, 'Room is no longer available');
+            }
         }
 
         return transaction.reservation.create({
@@ -303,15 +300,10 @@ router.get('/room-availability', handle(async (req, res) => {
     if (!room) return res.json({ available: false, reason: 'Room not found' });
 
     const overlappingReservation = await prisma.reservation.findFirst({
-        where: {
-            roomId: room.id,
-            status: { in: ['BOOKED', 'CHECKED_IN'] },
-            checkInDate: { lt: checkOut },
-            checkOutDate: { gt: checkIn },
-        },
+        where: { roomId: room.id, ...reservationOverlapWhere(checkIn, checkOut) },
         select: { id: true },
     });
-    const available = room.status === 'AVAILABLE' && !overlappingReservation;
+    const available = room.status !== 'MAINTENANCE' && !overlappingReservation;
     res.json({
         available,
         reason: available ? null : room.status === 'MAINTENANCE' ? 'Room is under maintenance' : 'Room is not available for these dates',

@@ -1,4 +1,4 @@
-import { assertUuid, httpError, parseDate, withLogging, BLOCKING_RESERVATION_STATUSES } from "./roomHelper.js";
+import { assertUuid, httpError, parseDate, reservationOverlapWhere, withLogging } from "./roomHelper.js";
 import prisma from "../database/index.js";
 
 export const findAvailableRooms = withLogging(
@@ -20,9 +20,7 @@ export const findAvailableRooms = withLogging(
                 ...(capacity !== undefined && { roomType: { capacity: { gte: capacity } } }),
                 reservations: {
                     none: {
-                        status: { in: BLOCKING_RESERVATION_STATUSES },
-                        checkInDate: { lt: checkOut },
-                        checkOutDate: { gt: checkIn },
+                        ...reservationOverlapWhere(checkIn, checkOut),
                     },
                 },
             },
@@ -31,4 +29,3 @@ export const findAvailableRooms = withLogging(
         });
     },
 );
-

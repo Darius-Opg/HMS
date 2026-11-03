@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Download, FileClock, Search, ShieldAlert } from "lucide-react";
 import { listAuditLogs } from "../lib/auditLogApi";
@@ -64,7 +65,15 @@ function downloadCsv(logs) {
 
 export default function AuditLogPage() {
     const { user } = useAuth();
-    const [range, setRange] = useState(getDefaultRange);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const performedById = searchParams.get("performedById") || "";
+    const [range, setRange] = useState(() => {
+        const defaults = getDefaultRange();
+        return {
+            from: searchParams.get("from") || defaults.from,
+            to: searchParams.get("to") || defaults.to,
+        };
+    });
     const [search, setSearch] = useState("");
     const [appliedSearch, setAppliedSearch] = useState("");
     const [page, setPage] = useState(1);
@@ -80,7 +89,7 @@ export default function AuditLogPage() {
         }
 
         let cancelled = false;
-        listAuditLogs({ ...range, page, limit: PAGE_SIZE, search: appliedSearch })
+        listAuditLogs({ ...range, page, limit: PAGE_SIZE, search: appliedSearch, performedById })
             .then((data) => {
                 if (!cancelled) {
                     setResult(data);
@@ -99,7 +108,7 @@ export default function AuditLogPage() {
         return () => {
             cancelled = true;
         };
-    }, [appliedSearch, hasAccess, page, range]);
+    }, [appliedSearch, hasAccess, page, performedById, range]);
 
     function updateRange(field, value) {
         setIsLoading(true);
@@ -194,6 +203,24 @@ export default function AuditLogPage() {
                         Apply filters
                     </button>
                 </form>
+
+                {performedById && (
+                    <div className="app-card flex flex-wrap items-center justify-between gap-3 p-3 text-sm" role="status">
+                        <span>Showing actions performed by user {performedById}.</span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const nextParams = new URLSearchParams(searchParams);
+                                nextParams.delete("performedById");
+                                setSearchParams(nextParams);
+                                setPage(1);
+                            }}
+                            className="app-button min-h-9"
+                        >
+                            Clear user filter
+                        </button>
+                    </div>
+                )}
 
                 {error && <p className="app-error" role="alert">{error}</p>}
 

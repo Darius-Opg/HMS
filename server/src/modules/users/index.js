@@ -183,7 +183,13 @@ router.post('/', async (req, res) => {
 
     try {
         const user = await createUser({ name, email, phone, idNumber, password, role, permissions });
-        await logActivity({ action: 'USER_CREATED', entityType: 'USER', entityId: user.id, performedById: req.user.id, metadata: { role: user.role } });
+        await logActivity({
+            action: 'USER_CREATED',
+            entityType: 'USER',
+            entityId: user.id,
+            performedById: req.user.id,
+            metadata: { role: user.role, changedFields: ['name', 'email', 'phone', 'idNumber'] },
+        });
         const { phoneEncrypted, phoneHash, idNumberEncrypted, idNumberHash, ...safeUser } = user;
         res.status(201).json(safeUser);
     } catch (err) {
@@ -240,6 +246,39 @@ router.get('/', async (req, res) => {
     res.json(await listUsers({ includeSensitive: req.query.includeSensitive === 'true' }));
 });
 
+router.get('/:id/history', async (req, res) => {
+    try {
+        const history = await prisma.auditLog.findMany({
+            where: {
+                entityType: 'USER',
+                entityId: req.params.id,
+                action: { in: ['USER_CREATED', 'USER_UPDATED'] },
+            },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            select: {
+                id: true,
+                action: true,
+                metadata: true,
+                createdAt: true,
+                performedBy: { select: { name: true } },
+            },
+        });
+        const personalFields = new Set(['name', 'email', 'phone', 'idNumber']);
+        res.json(history.map(({ performedBy, metadata, ...entry }) => ({
+            ...entry,
+            metadata: {
+                ...(Array.isArray(metadata?.changedFields) && {
+                    changedFields: metadata.changedFields.filter((field) => personalFields.has(field)),
+                }),
+            },
+            performedBy: performedBy?.name ?? 'System',
+        })));
+    } catch (error) {
+        logError('user activity history', error);
+        res.status(500).json({ error: 'Could not load user activity.' });
+    }
+});
+
 router.get('/:id', async (req, res) => {
     const user = await getUserById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -249,6 +288,15 @@ router.get('/:id', async (req, res) => {
 router.patch('/:id', async (req, res) => {
     const { name, email, role, permissions, phone, idNumber } = req.body;
     try {
+        const previousUser = await prisma.user.findUnique({
+            where: { id: req.params.id },
+            select: {
+                name: true,
+                email: true,
+                phoneHash: true,
+                idNumberHash: true,
+            },
+        });
         const user = await updateUser(req.params.id, {
             name,
             email,
@@ -257,7 +305,18 @@ router.patch('/:id', async (req, res) => {
             phone,
             idNumber,
         });
-        await logActivity({ action: 'USER_UPDATED', entityType: 'USER', entityId: user.id, performedById: req.user.id, metadata: { role: user.role } });
+        const changedFields = [];
+        if (previousUser && name !== undefined && name !== previousUser.name) changedFields.push('name');
+        if (previousUser && email !== undefined && email !== previousUser.email) changedFields.push('email');
+        if (previousUser && phone !== undefined && hash(phone) !== previousUser.phoneHash) changedFields.push('phone');
+        if (previousUser && idNumber !== undefined && hash(idNumber) !== previousUser.idNumberHash) changedFields.push('idNumber');
+        await logActivity({
+            action: 'USER_UPDATED',
+            entityType: 'USER',
+            entityId: user.id,
+            performedById: req.user.id,
+            metadata: { role: user.role, changedFields },
+        });
         res.json(user);
     } catch (err) {
         logError('user update', err);

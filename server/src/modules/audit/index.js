@@ -42,7 +42,12 @@ router.get('/', async (req, res) => {
         }
 
         const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+        const performedById = typeof req.query.performedById === 'string' ? req.query.performedById : '';
+        if (performedById && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(performedById)) {
+            return res.status(400).json({ error: 'performedById must be a valid user ID.' });
+        }
         const where = {
+            ...(performedById && { performedById }),
             ...(from || to) && {
                 createdAt: {
                     ...(from && { gte: from }),

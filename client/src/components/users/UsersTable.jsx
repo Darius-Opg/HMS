@@ -21,7 +21,7 @@ function UserActions({
     onActivate,
 }) {
     return (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
             <button
                 type="button"
                 className="app-table-action"
@@ -97,6 +97,7 @@ function UserActions({
 
 export default function UsersTable({
     users,
+    onViewDetails,
     onResetPassword,
     onDeactivate,
     onDelete,
@@ -121,8 +122,24 @@ export default function UsersTable({
                 </thead>
                 <tbody>
                     {users.map((user) => (
-                        <tr key={user.id}>
-                            <td className="font-medium">{user.name || "—"}</td>
+                        <tr
+                            key={user.id}
+                            onClick={() => onViewDetails?.(user)}
+                            className="cursor-pointer"
+                        >
+                            <td className="font-medium">
+                                <button
+                                    type="button"
+                                    aria-label={`View details for ${user.name || "user"}`}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onViewDetails?.(user);
+                                    }}
+                                    className="rounded-sm text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4AF7A]"
+                                >
+                                    {user.name || "—"}
+                                </button>
+                            </td>
                             <td>{formatDate(user.createdAt)}</td>
                             <td>{user.phone || "—"}</td>
                             <td>

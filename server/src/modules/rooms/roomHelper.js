@@ -3,7 +3,27 @@ import { logError } from '../audit/logActivity.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const BLOCKING_RESERVATION_STATUSES = ['BOOKED', 'CHECKED_IN'];
+export function reservationOverlapWhere(checkIn, checkOut, excludeReservationId) {
+    return {
+        ...(excludeReservationId && { id: { not: excludeReservationId } }),
+        OR: [
+            {
+                status: 'BOOKED',
+                checkInDate: { lt: checkOut },
+                checkOutDate: { gt: checkIn },
+            },
+            {
+                status: 'CHECKED_IN',
+                actualCheckOut: null,
+                OR: [
+                    { actualCheckIn: { lt: checkOut } },
+                    { actualCheckIn: null, checkInDate: { lt: checkOut } },
+                ],
+                checkOutDate: { gt: checkIn },
+            },
+        ],
+    };
+}
 
 export function httpError(status, message) {
     const error = new Error(message);

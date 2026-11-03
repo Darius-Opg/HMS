@@ -16,6 +16,7 @@ import HouseKeeping from './pages/HouseKeeping';
 import ResetPassword from './pages/ResetPassword';
 import ReportsPage from './pages/ReportsPage';
 import AuditLogPage from './pages/AuditLogPage';
+import { ThemeProvider } from './context/ThemeProvider';
 
 function AppRoutes() {
   return (
@@ -49,10 +50,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

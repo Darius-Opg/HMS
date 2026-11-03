@@ -251,7 +251,15 @@ export default function Room() {
 
 export function RoomBanner() {
     const location = useLocation();
-    const { roomName, occupied, total, maintainance = location.state?.maintenance, available } = location.state || {};
+    const {
+        roomName,
+        occupied,
+        total,
+        maintainance,
+        features: roomTypeFeatures = [],
+        available,
+    } = location.state || {};
+    const features = getRoomFeatureLabels(roomTypeFeatures);
     const navigate = useNavigate();
     return (
         <section className="app-card p-6">
@@ -265,6 +273,20 @@ export function RoomBanner() {
             <p className="app-muted-text mt-2 text-sm">
                 These rooms have the same rate unless determined otherwise.
             </p>
+            <div className="mt-5">
+                <h2 className="app-accent-label">Features</h2>
+                {features.length > 0 ? (
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                        {features.map((feature, index) => (
+                            <li key={`${feature}-${index}`} className="app-chip">
+                                {feature}
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="app-muted-text mt-2 text-sm">No features listed for this room type.</p>
+                )}
+            </div>
 
             <dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
                 {[

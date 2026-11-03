@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import UsersTable from "../components/users/UsersTable";
+import UserDetailsModal from "../components/users/UserDetailsModal";
 import UsersToolBar from "../components/users/UsersToolbar";
 import ReservationModal from "../components/ReservationUpdateModal";
 import NewUserForm from "../components/users/NewUserForm";
@@ -38,6 +40,7 @@ function userMatchesFilters(user, filters) {
 }
 
 export default function UsersPage() {
+    const navigate = useNavigate();
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(true);
     const [users, setUsers] = useState([]);
@@ -45,6 +48,7 @@ export default function UsersPage() {
     const [refreshKey, setRefreshKey] = useState(0);
     const [isNewUserOpen, setIsNewUserOpen] = useState(false);
     const [selectedUserAction, setSelectedUserAction] = useState(null);
+    const [selectedUserDetails, setSelectedUserDetails] = useState(null);
     const [actionError, setActionError] = useState("");
     const [isActionSubmitting, setIsActionSubmitting] = useState(false);
     const [passwordResetMessage, setPasswordResetMessage] = useState("");
@@ -188,6 +192,19 @@ export default function UsersPage() {
                     </ReservationModal>
                 )}
 
+                {selectedUserDetails && (
+                    <UserDetailsModal
+                        key={selectedUserDetails.id}
+                        user={selectedUserDetails}
+                        onClose={() => setSelectedUserDetails(null)}
+                        onViewAudit={(user) => {
+                            setSelectedUserDetails(null);
+                            const throughToday = new Date().toISOString().slice(0, 10);
+                            navigate(`/audit-log?performedById=${encodeURIComponent(user.id)}&from=1970-01-01&to=${throughToday}`);
+                        }}
+                    />
+                )}
+
                 {selectedUserAction && (
                     <ReservationModal
                         onClose={() => {
@@ -257,6 +274,7 @@ export default function UsersPage() {
                     <section aria-label="Site users">
                         <UsersTable
                             users={filteredUsers}
+                            onViewDetails={setSelectedUserDetails}
                             onResetPassword={resetPassword}
                             onDeactivate={(user) => openUserAction("deactivate", user)}
                             onDelete={(user) => openUserAction("delete", user)}

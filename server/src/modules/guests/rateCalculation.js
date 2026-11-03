@@ -44,7 +44,23 @@ export function calculateTotalFees(hourlyRate, period, periodUnit) {
         return null;
     }
 
-    return rate.times(duration).times(hoursPerUnit).div(24).toDecimalPlaces(2);
+    return rate.times(duration).times(hoursPerUnit).toDecimalPlaces(2);
 }
 
+export function calculateTotalFeesForStay(hourlyRate, checkInDate, checkOutDate) {
+    let rate;
+    try {
+        rate = new Prisma.Decimal(String(hourlyRate));
+    } catch {
+        return null;
+    }
 
+    const checkIn = new Date(checkInDate).getTime();
+    const checkOut = new Date(checkOutDate).getTime();
+    if (!rate.isFinite() || rate.lt(0) || !Number.isFinite(checkIn) || !Number.isFinite(checkOut) || checkOut <= checkIn) {
+        return null;
+    }
+
+    const hours = new Prisma.Decimal(checkOut - checkIn).div(3_600_000);
+    return rate.times(hours).toDecimalPlaces(2);
+}

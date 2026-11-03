@@ -19,6 +19,9 @@ export default function HouseKeeping() {
     const [roomTypes, setRoomTypes] = useState([]);
     const [filters, setFilters] = useState({ roomName: "", roomTypeId: "", status: "" });
     const [selectedRoom, setSelectedRoom] = useState(null);
+    const [roomToDelete, setRoomToDelete] = useState(null);
+    const [isDeletingRoom, setIsDeletingRoom] = useState(false);
+    const [deleteRoomError, setDeleteRoomError] = useState("");
     const [isRoomFormOpen, setIsRoomFormOpen] = useState(false);
     const [isRoomTypeFormOpen, setIsRoomTypeFormOpen] = useState(false);
     const [selectedRoomType, setSelectedRoomType] = useState(null);
@@ -122,16 +125,26 @@ export default function HouseKeeping() {
         setNotice("");
     }
 
-    async function removeRoom(room) {
-        if (!window.confirm(`Delete room ${room.roomNumber}?`)) return;
+    function removeRoom(room) {
         setError("");
         setNotice("");
+        setDeleteRoomError("");
+        setRoomToDelete(room);
+    }
+
+    async function confirmDeleteRoom() {
+        if (!roomToDelete?.id || isDeletingRoom) return;
+        const room = roomToDelete;
+        setIsDeletingRoom(true);
         try {
             await deleteHousekeepingRoom(room.id);
+            setRoomToDelete(null);
             setNotice(`Room ${room.roomNumber} deleted.`);
             reload();
         } catch (deleteError) {
-            setError(deleteError instanceof Error ? deleteError.message : "Could not delete room.");
+            setDeleteRoomError(deleteError instanceof Error ? deleteError.message : "Could not delete room.");
+        } finally {
+            setIsDeletingRoom(false);
         }
     }
 
@@ -227,6 +240,66 @@ export default function HouseKeeping() {
                             onSave={saveRoomType}
                         />
                     </div>
+                </div>
+            )}
+
+            {roomToDelete && (
+                <div className="app-modal-overlay z-[70]">
+                    <section
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="delete-room-dialog-title"
+                        aria-describedby="delete-room-dialog-description"
+                        className="app-modal max-w-md"
+                    >
+                        <div className="mb-5">
+                            <p className="app-accent-label mb-1">Confirm deletion</p>
+                            <h2 id="delete-room-dialog-title" className="text-xl font-semibold text-gray-900 dark:text-white">
+                                Delete room {roomToDelete.roomNumber}?
+                            </h2>
+                            <p id="delete-room-dialog-description" className="app-muted-text mt-2 text-sm">
+                                This permanently deletes this room. This action cannot be undone.
+                            </p>
+                        </div>
+                        {deleteRoomError && (
+                            <p role="alert" className="app-error mb-4">{deleteRoomError}</p>
+                        )}
+                        <dl className="mb-6 grid grid-cols-2 gap-3 rounded-lg border border-[#AB784D]/20 bg-white/40 p-4 text-sm dark:border-[#B38A5E]/25 dark:bg-black/10">
+                            <div>
+                                <dt className="app-accent-label">Room</dt>
+                                <dd className="mt-1 font-medium text-gray-900 dark:text-white">{roomToDelete.roomNumber}</dd>
+                            </div>
+                            <div>
+                                <dt className="app-accent-label">Type</dt>
+                                <dd className="mt-1 font-medium text-gray-900 dark:text-white">{roomToDelete.roomType?.name ?? "Unknown"}</dd>
+                            </div>
+                            <div>
+                                <dt className="app-accent-label">Status</dt>
+                                <dd className="mt-1 font-medium text-gray-900 dark:text-white">{roomToDelete.status ?? "Unknown"}</dd>
+                            </div>
+                        </dl>
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setRoomToDelete(null);
+                                    setDeleteRoomError("");
+                                }}
+                                disabled={isDeletingRoom}
+                                className="app-button"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmDeleteRoom}
+                                disabled={isDeletingRoom}
+                                className="app-button-primary bg-red-700 text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {isDeletingRoom ? "Deleting…" : `Delete room ${roomToDelete.roomNumber}`}
+                            </button>
+                        </div>
+                    </section>
                 </div>
             )}
         </main>

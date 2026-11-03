@@ -3,9 +3,10 @@ import prisma from '../database/index.js';
 import { ReservationStatus } from '../../generated/prisma/index.js';
 import { requireAuth, requirePermission } from '../auth/access.js';
 import { handle } from '../rooms/index.js';
-import { assertUuid, httpError, parseDate } from '../rooms/roomHelper.js';
+import { assertUuid, httpError, parseDate, reservationOverlapWhere } from '../rooms/roomHelper.js';
 import { logActivity } from '../audit/logActivity.js';
 import { Prisma } from '../../generated/prisma/index.js';
+import { calculateTotalFeesForStay } from '../guests/rateCalculation.js';
 
 
 export const router = express.Router();
@@ -93,7 +94,7 @@ function calculateExtraTimeCharge(checkOutDate, rateAtBooking, isActive) {
         : 0;
 
     return extraTimeStayedMinutes > 60
-        ? new Prisma.Decimal(rateAtBooking).times(extraTimeStayedMinutes).div(1440).toDecimalPlaces(2)
+        ? new Prisma.Decimal(rateAtBooking).times(extraTimeStayedMinutes).div(60).toDecimalPlaces(2)
         : new Prisma.Decimal(0);
 }
 
@@ -115,33 +116,37 @@ router.patch('/modify', handle(async (req, res) => {
 
         const targetRoom = await tx.room.findUnique({ where: { id: nextRoomId }, select: { id: true, status: true } });
         if (!targetRoom) throw httpError(404, 'Room not found');
-        if (nextRoomId !== current.roomId && targetRoom.status !== 'AVAILABLE') throw httpError(409, 'Room is not available');
+        if (nextRoomId !== current.roomId && targetRoom.status === 'MAINTENANCE') throw httpError(409, 'Room is under maintenance');
         const overlap = await tx.reservation.findFirst({
             where: {
-                id: { not: reservationId }, roomId: nextRoomId,
-                status: { in: ['BOOKED', 'CHECKED_IN'] },
-                checkInDate: { lt: nextCheckOut }, checkOutDate: { gt: nextCheckIn },
+                roomId: nextRoomId,
+                ...reservationOverlapWhere(nextCheckIn, nextCheckOut, reservationId),
             }, select: { id: true },
         });
         if (overlap) throw httpError(409, 'Room is already reserved for the selected period');
 
-        const days = new Prisma.Decimal(nextCheckOut.getTime() - nextCheckIn.getTime()).div(86_400_000);
-        const base = new Prisma.Decimal(current.rateAtBooking).times(days).toDecimalPlaces(2);
+        const base = calculateTotalFeesForStay(current.rateAtBooking, nextCheckIn, nextCheckOut);
+        if (base === null) throw httpError(400, 'Reservation rate or dates are invalid');
         const extras = new Prisma.Decimal(current.invoice?.extraCharges ?? 0);
         const total = base.plus(extras).toDecimalPlaces(2);
         const amountPaid = new Prisma.Decimal(current.invoice?.amountPaid ?? 0);
         if (amountPaid.gt(total)) throw httpError(409, 'The updated stay total cannot be less than the amount already paid');
 
         if (nextRoomId !== current.roomId) {
-            const claimed = await tx.room.updateMany({ where: { id: nextRoomId, status: 'AVAILABLE' }, data: { status: 'RESERVED' } });
-            if (claimed.count !== 1) throw httpError(409, 'Room is no longer available');
+            if (targetRoom.status === 'AVAILABLE') {
+                const claimed = await tx.room.updateMany({ where: { id: nextRoomId, status: 'AVAILABLE' }, data: { status: 'RESERVED' } });
+                if (claimed.count !== 1) throw httpError(409, 'Room is no longer available');
+            }
         }
         await tx.reservation.update({ where: { id: reservationId }, data: { roomId: nextRoomId, checkInDate: nextCheckIn, checkOutDate: nextCheckOut } });
         if (nextRoomId !== current.roomId) {
-            const remainingBookings = await tx.reservation.count({ where: { roomId: current.roomId, status: 'BOOKED' } });
+            const [remainingBookings, checkedInGuests] = await Promise.all([
+                tx.reservation.count({ where: { roomId: current.roomId, status: 'BOOKED' } }),
+                tx.reservation.count({ where: { roomId: current.roomId, status: 'CHECKED_IN' } }),
+            ]);
             await tx.room.updateMany({
                 where: { id: current.roomId, status: 'RESERVED' },
-                data: { status: remainingBookings ? 'RESERVED' : 'AVAILABLE' },
+                data: { status: checkedInGuests ? 'OCCUPIED' : remainingBookings ? 'RESERVED' : 'AVAILABLE' },
             });
         }
         if (current.invoice) {
@@ -183,8 +188,8 @@ router.patch('/update', handle(async (req, res) => {
         }
         if (!reservation.invoice) throw httpError(409, 'Reservation has no invoice');
 
-        const durationDays = new Prisma.Decimal(checkOutDate.getTime() - reservation.checkInDate.getTime()).div(86_400_000);
-        const totalAmount = new Prisma.Decimal(reservation.rateAtBooking).times(durationDays).toDecimalPlaces(2);
+        const totalAmount = calculateTotalFeesForStay(reservation.rateAtBooking, reservation.checkInDate, checkOutDate);
+        if (totalAmount === null) throw httpError(400, 'Reservation rate or dates are invalid');
         const currentAmountPaid = new Prisma.Decimal(reservation.invoice.amountPaid);
         const extraTimeCharge = new Prisma.Decimal(0);
         const totalDue = totalAmount.plus(extraTimeCharge).plus(reservation.invoice.extraCharges).toDecimalPlaces(2);

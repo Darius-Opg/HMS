@@ -24,5 +24,6 @@ export function calculateTotalFees(hourlyRate, period, periodUnit) {
         return null;
     }
 
-    return Math.round(rate * duration * hoursPerUnit * 100) / 100;
+    const total = rate * duration * hoursPerUnit;
+    return Math.round((total + Number.EPSILON * Math.max(1, Math.abs(total))) * 100) / 100;
 }

@@ -17,6 +17,15 @@ export async function listUsers() {
     return users;
 }
 
+export async function getUserHistory(userId) {
+    const response = await apiFetch(`/users/${encodeURIComponent(userId)}/history`);
+    const entries = await readResponse(response, "Could not load user activity.");
+    if (!Array.isArray(entries)) {
+        throw new Error("The user activity response was not a list.");
+    }
+    return entries;
+}
+
 export async function registerNewUser({ name, idNumber, email, role, phone, password }) {
     const res = await apiFetch('/users', {
         method: "POST",
