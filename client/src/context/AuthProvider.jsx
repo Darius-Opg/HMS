@@ -4,14 +4,17 @@ import { apiFetch, refreshSession, setAccessToken, setAuthFailureHandler } from 
 import { AuthContext } from './AuthContext';
 
 export function AuthProvider({ children }) {
+    const isLoginRoute = window.location.pathname === '/login';
     const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!isLoginRoute);
 
     useEffect(() => {
         setAuthFailureHandler(() => {
             setAccessToken(null);
             setUser(null);
         });
+
+        if (window.location.pathname === '/login') return;
 
         let active = true;
         refreshSession().then((data) => {

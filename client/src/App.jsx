@@ -28,10 +28,10 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/account" element={<Account />} />
         <Route path="/reservations" element={<ReservationPage />} />
+        <Route path="/roompage" element={<RoomPage />} />
       </Route>
 
       <Route element={<StaffLayoutWrapper />}>
-        <Route path="/roompage" element={<RoomPage />} />
         <Route path="/staff/guests" element={<StaffGuestPage />} />
       </Route>
 

@@ -3,7 +3,7 @@ import Button from "./Button";
 import { reserveRoom } from "../lib/roomApi";
 import { calculateTotalFees } from "../lib/rates";
 
-export default function RoomAllocationModal({ room, hourlyRate, onCancel }) {
+export default function RoomAllocationModal({ room, hourlyRate, onCancel, onAllocated }) {
     const [submissionError, setSubmissionError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -13,6 +13,7 @@ export default function RoomAllocationModal({ room, hourlyRate, onCancel }) {
 
         try {
             await reserveRoom(allocation);
+            onAllocated?.(allocation);
             onCancel();
         } catch (error) {
             setSubmissionError(error instanceof Error ? error.message : "Failed to reserve room");

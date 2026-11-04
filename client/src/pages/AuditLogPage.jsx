@@ -119,10 +119,14 @@ export default function AuditLogPage() {
 
     function applySearch(event) {
         event.preventDefault();
+        const nextSearch = search.trim();
+        setSearch(nextSearch);
+        if (nextSearch === appliedSearch && page === 1) return;
+
         setIsLoading(true);
         setError("");
         setPage(1);
-        setAppliedSearch(search.trim());
+        setAppliedSearch(nextSearch);
     }
 
     if (!hasAccess) {

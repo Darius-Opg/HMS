@@ -11,6 +11,7 @@ import { router as reservationRouter } from "../modules/reservations/index.js";
 import { router as reportsRouter } from "../modules/reports/index.js";
 import { router as auditLogRouter } from "../modules/audit/index.js";
 import { router as billingRouter } from "../modules/billing/index.js";
+import { router as searchRouter } from "../modules/search/index.js";
 import { globalLimiter } from "../modules/auth/rateLimit.js";
 
 const app = express();
@@ -34,6 +35,7 @@ app.use("/reservations", reservationRouter);
 app.use("/billing", billingRouter);
 app.use("/reports", reportsRouter);
 app.use("/audit-logs", auditLogRouter);
+app.use("/search", searchRouter);
 
 
 

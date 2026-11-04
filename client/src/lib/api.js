@@ -1,5 +1,3 @@
-// client/src/lib/api.js
-//
 // Thin fetch wrapper. The access token lives in a module variable
 // (in memory only, never localStorage) and is sent two ways on every
 // request: as an Authorization header AND via the accessToken cookie

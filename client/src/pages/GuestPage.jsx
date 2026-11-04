@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { BedDouble, LogOut, UserRound, Users } from "lucide-react";
 import ReservationModal from "../components/ReservationUpdateModal.jsx";
+import GuestDetailsModal from "../components/GuestDetailsModal.jsx";
 import GuestHistory from "../components/guests/GuestHistory.jsx";
 import GuestReserveForm from "../components/guests/GuestReserveForm.jsx";
 import GuestTable from "../components/guests/GuestTable.jsx";
+import NewReservationForm from "../components/NewReservationForm.jsx";
 import StatCard from "../components/guests/StatCard.jsx";
 import { getFrontDeskGuests, getGuests, softDeleteGuest } from "../lib/guestApi.js";
 import { reserveRoom } from "../lib/roomApi.js";
@@ -26,7 +29,11 @@ function hasNoReservations(guest) {
 
 export default function GuestPage({ frontDesk = false }) {
     const { user } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
     const isAdmin = !frontDesk && user?.role?.toUpperCase() === "ADMIN";
+    const selectedSearchGuest = location.state?.selectedGuest;
+    const [guestForNewReservation, setGuestForNewReservation] = useState(null);
     const [guests, setGuests] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
@@ -104,6 +111,13 @@ export default function GuestPage({ frontDesk = false }) {
     const checkedInCount = guests.filter((guest) => getGuestReservationStatus(guest) === "CHECKED_IN").length;
     const checkedOutCount = guests.filter((guest) => getGuestReservationStatus(guest) === "CHECKED_OUT").length;
     const noReservationCount = guests.filter(hasNoReservations).length;
+
+    function closeSearchGuest() {
+        navigate(location.pathname, {
+            replace: true,
+            state: { ...location.state, selectedGuest: null },
+        });
+    }
 
     return (
         <main className="app-page app-content-with-sidebar min-h-screen px-4 pb-8 pt-20 sm:px-6">
@@ -219,6 +233,32 @@ export default function GuestPage({ frontDesk = false }) {
                                 error={actionError}
                             />
                         )}
+                    </ReservationModal>
+                )}
+                {selectedSearchGuest && (
+                    <GuestDetailsModal
+                        guest={selectedSearchGuest}
+                        onClose={closeSearchGuest}
+                        staffView={frontDesk}
+                        onAllocate={() => {
+                            setGuestForNewReservation(selectedSearchGuest);
+                            closeSearchGuest();
+                        }}
+                    />
+                )}
+                {guestForNewReservation && (
+                    <ReservationModal
+                        onClose={() => setGuestForNewReservation(null)}
+                        title="Create a new reservation"
+                    >
+                        <NewReservationForm
+                            initialGuest={guestForNewReservation}
+                            onClose={() => setGuestForNewReservation(null)}
+                            onCreated={() => {
+                                setNotice("Reservation created for the selected guest.");
+                                setRefreshKey((key) => key + 1);
+                            }}
+                        />
                     </ReservationModal>
                 )}
             </div>

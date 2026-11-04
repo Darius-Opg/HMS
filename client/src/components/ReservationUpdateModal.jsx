@@ -70,21 +70,25 @@ export function UpdateStayForm({ onClose, onSubmit, reservation }) {
     const checkOutTimestamp = new Date(checkOutTime).getTime();
     const checkInTimestamp = new Date(reservation?.checkInDate).getTime();
     const hourlyRate = Number(reservation?.rateAtBooking ?? 0);
+    const extraCharges = Number(reservation?.invoice?.extraCharges ?? 0);
     const canEstimate = Number.isFinite(checkOutTimestamp)
         && Number.isFinite(checkInTimestamp)
         && checkOutTimestamp > checkInTimestamp
-        && Number.isFinite(hourlyRate);
+        && Number.isFinite(hourlyRate)
+        && Number.isFinite(extraCharges);
     const stayTotal = canEstimate
         ? Math.round(hourlyRate * ((checkOutTimestamp - checkInTimestamp) / 3_600_000) * 100) / 100
         : 0;
-    const overdueMinutes = canEstimate && currentTime > checkOutTimestamp
+    const overdueMinutes = canEstimate
+        && reservation?.status === "CHECKED_IN"
+        && currentTime > checkOutTimestamp
         ? Math.floor((currentTime - checkOutTimestamp) / 60_000)
         : 0;
     const overdueCharge = overdueMinutes > 60
         ? Math.round((hourlyRate * overdueMinutes / 60) * 100) / 100
         : 0;
     const estimatedBalance = canEstimate
-        ? Math.max(Math.round((stayTotal + overdueCharge - Number(reservation?.invoice?.amountPaid ?? 0)) * 100) / 100, 0)
+        ? Math.max(Math.round((stayTotal + extraCharges + overdueCharge - Number(reservation?.invoice?.amountPaid ?? 0)) * 100) / 100, 0)
         : Number(reservation?.balance ?? 0);
     const balance = formatCurrency.format(estimatedBalance);
 

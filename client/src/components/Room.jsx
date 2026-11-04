@@ -294,7 +294,7 @@ export function RoomBanner() {
                     ["Available", available],
                     ["Occupied", occupied],
                     ["Maintenance", maintainance],
-                ].map(([label, value]) => (
+                ].filter(([, value]) => value !== undefined && value !== null).map(([label, value]) => (
                     <div key={label} className="rounded-md bg-[#F9F6F2] p-3 dark:bg-[#0A0A0A]/70">
                         <dt className="app-accent-label">
                             {label}

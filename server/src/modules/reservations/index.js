@@ -6,7 +6,7 @@ import { handle } from '../rooms/index.js';
 import { assertUuid, httpError, parseDate, reservationOverlapWhere } from '../rooms/roomHelper.js';
 import { logActivity } from '../audit/logActivity.js';
 import { Prisma } from '../../generated/prisma/index.js';
-import { calculateTotalFeesForStay } from '../guests/rateCalculation.js';
+import { calculateExtraTimeCharge, calculateTotalFeesForStay } from '../guests/rateCalculation.js';
 
 
 export const router = express.Router();
@@ -86,17 +86,6 @@ router.patch('/checkin', handle(async (req, res) => {
     });
     res.json(checkedIn);
 }));
-
-function calculateExtraTimeCharge(checkOutDate, rateAtBooking, isActive) {
-    const checkOutTime = new Date(checkOutDate).getTime();
-    const extraTimeStayedMinutes = isActive && checkOutTime < Date.now()
-        ? Math.floor((Date.now() - checkOutTime) / 60_000)
-        : 0;
-
-    return extraTimeStayedMinutes > 60
-        ? new Prisma.Decimal(rateAtBooking).times(extraTimeStayedMinutes).div(60).toDecimalPlaces(2)
-        : new Prisma.Decimal(0);
-}
 
 router.patch('/modify', handle(async (req, res) => {
     const { reservationId, roomId } = req.body ?? {};
@@ -475,18 +464,26 @@ router.get('/', handle(async (req, res) => {
     const now = Date.now();
     const result = reservations.map((reservation) => {
         const checkOutTime = new Date(reservation.checkOutDate).getTime();
-        const isActive = reservation.status === 'BOOKED' || reservation.status === 'CHECKED_IN';
-        const extraTimeStayedMinutes = isActive && checkOutTime < now
+        const isCheckedIn = reservation.status === ReservationStatus.CHECKED_IN;
+        const extraTimeStayedMinutes = isCheckedIn && checkOutTime < now
             ? Math.floor((now - checkOutTime) / 60_000)
             : 0;
         const extraTimeCharge = calculateExtraTimeCharge(
             reservation.checkOutDate,
             reservation.rateAtBooking,
-            isActive,
+            isCheckedIn,
         );
-        const invoiceTotal = Number(reservation.invoice?.totalAmount ?? 0);
-        const amountPaid = Number(reservation.invoice?.amountPaid ?? 0);
-        const balance = Math.max(invoiceTotal + extraTimeCharge - amountPaid, 0);
+        const stayTotal = calculateTotalFeesForStay(
+            reservation.rateAtBooking,
+            reservation.checkInDate,
+            reservation.checkOutDate,
+        );
+        const extraCharges = new Prisma.Decimal(reservation.invoice?.extraCharges ?? 0);
+        const amountPaid = new Prisma.Decimal(reservation.invoice?.amountPaid ?? 0);
+        const totalDue = stayTotal
+            ? stayTotal.plus(extraCharges).plus(extraTimeCharge).toDecimalPlaces(2)
+            : new Prisma.Decimal(0);
+        const balance = Math.max(Number(totalDue.minus(amountPaid).toDecimalPlaces(2).toString()), 0);
 
         return { ...reservation, extraTimeStayedMinutes, extraTimeCharge, balance };
     });

@@ -3,7 +3,7 @@ import { requireAuth, requirePermission } from '../auth/access.js';
 import { handle } from '../rooms/index.js';
 import { assertUuid, httpError, parseDate, reservationOverlapWhere, withLogging } from '../rooms/roomHelper.js';
 import { decrypt, encrypt, hash } from '../security/index.js';
-import { calculateStayDate, calculateTotalFees } from './rateCalculation.js';
+import { calculateStayDate, calculateTotalFeesForStay } from './rateCalculation.js';
 import { listFrontDeskGuests, listGuests } from './guestList.js';
 import prisma from '../database/index.js';
 import { Prisma } from '../../generated/prisma/index.js';
@@ -79,7 +79,7 @@ export const reserveRoom = withLogging('reserveRoom', async (req, res) => {
             throw httpError(409, 'Room is already reserved for the selected period');
         }
 
-        const totalAmount = calculateTotalFees(room.roomType.basePrice, period, periodUnit);
+        const totalAmount = calculateTotalFeesForStay(room.roomType.basePrice, checkIn, checkOut);
         if (totalAmount === null) {
             throw httpError(400, 'Room rate or reservation period is invalid');
         }

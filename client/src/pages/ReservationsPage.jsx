@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import GuestReservationCard from "../components/ReservedCard";
 import ReservationToolBar from "../components/ReservationToolBar";
 import NewReservationForm from "../components/NewReservationForm";
@@ -10,13 +11,18 @@ import {
     getReservations,
 } from "../lib/reservationApi";
 import ReservationModal, { CheckOutCard, UpdateStayForm } from "../components/ReservationUpdateModal";
+import ReservationDetailsModal from "../components/ReservationDetailsModal";
 
 function getGuestName(guest) {
     return [guest?.firstName, guest?.lastName].filter(Boolean).join(" ");
 }
 
 export default function ReservationsPage() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const selectedSearchReservation = location.state?.selectedReservation;
     const [reservations, setReservations] = useState([]);
+    const [guestForNewReservation, setGuestForNewReservation] = useState(null);
     const [isNewReservationOpen, setIsNewReservationOpen] = useState(false);
     const [reservationToUpdate, setReservationToUpdate] = useState(null);
     const [checkOutUpdate, setCheckOutUpdate] = useState(null);
@@ -32,6 +38,13 @@ export default function ReservationsPage() {
         const data = await getReservations();
         setReservations(data);
         setError("");
+    }
+
+    function closeSearchReservation() {
+        navigate(location.pathname, {
+            replace: true,
+            state: { ...location.state, selectedReservation: null },
+        });
     }
 
     useEffect(() => {
@@ -233,6 +246,39 @@ export default function ReservationsPage() {
                         onClose={() => setCheckOutUpdate(null)}
                         reservation={checkOutUpdate}
                         onSubmit={handleCheckOut}
+                    />
+                </ReservationModal>
+            )}
+            {selectedSearchReservation && (
+                <ReservationDetailsModal
+                    reservation={selectedSearchReservation}
+                    onClose={closeSearchReservation}
+                    onAllocate={() => {
+                        setGuestForNewReservation({
+                            id: selectedSearchReservation.guest?.id,
+                            firstName: selectedSearchReservation.guest?.firstName,
+                            lastName: selectedSearchReservation.guest?.lastName,
+                        });
+                        closeSearchReservation();
+                    }}
+                />
+            )}
+            {guestForNewReservation && (
+                <ReservationModal
+                    onClose={() => setGuestForNewReservation(null)}
+                    title="Create a new reservation"
+                >
+                    <NewReservationForm
+                        initialGuest={guestForNewReservation}
+                        onClose={() => setGuestForNewReservation(null)}
+                        onCreated={async () => {
+                            setGuestForNewReservation(null);
+                            try {
+                                await reloadReservations();
+                            } catch (loadError) {
+                                setError(loadError instanceof Error ? loadError.message : "Failed to refresh reservations");
+                            }
+                        }}
                     />
                 </ReservationModal>
             )}

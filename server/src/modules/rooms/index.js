@@ -33,38 +33,46 @@ export const handle = (fn) => async (req, res) => {
 
 export const router = express.Router();
 
-router.use(requireAuth, requirePermission('MANAGE_ROOMS'));
+router.use(requireAuth);
+
+function requireRoomReadAccess(req, res, next) {
+    const permissions = req.user?.permissions ?? [];
+    if (permissions.includes('MANAGE_ROOMS') || permissions.includes('MANAGE_RESERVATIONS')) {
+        return next();
+    }
+    return res.status(403).json({ error: 'Forbidden' });
+}
 
 // /types and /availability are declared before /:id so they aren't
 // mistaken for a room id.
 
-router.get('/types', handle(async (req, res) => {
+router.get('/types', requireRoomReadAccess, handle(async (req, res) => {
     res.json(await listRoomTypes());
 }));
 
-router.post('/types', handle(async (req, res) => {
+router.post('/types', requirePermission('MANAGE_ROOMS'), handle(async (req, res) => {
     const roomType = await createRoomType(req.body ?? {});
     await logActivity({ action: 'ROOM_TYPE_CREATED', entityType: 'ROOM_TYPE', entityId: roomType.id, performedById: req.user.id, metadata: { name: roomType.name } });
     res.status(201).json(roomType);
 }));
 
-router.get('/types/:id', handle(async (req, res) => {
+router.get('/types/:id', requireRoomReadAccess, handle(async (req, res) => {
     res.json(await getRoomTypeById(req.params.id));
 }));
 
-router.patch('/types/:id', handle(async (req, res) => {
+router.patch('/types/:id', requirePermission('MANAGE_ROOMS'), handle(async (req, res) => {
     const roomType = await updateRoomType(req.params.id, req.body ?? {});
     await logActivity({ action: 'ROOM_TYPE_UPDATED', entityType: 'ROOM_TYPE', entityId: roomType.id, performedById: req.user.id, metadata: { name: roomType.name } });
     res.json(roomType);
 }));
 
-router.delete('/types/:id', handle(async (req, res) => {
+router.delete('/types/:id', requirePermission('MANAGE_ROOMS'), handle(async (req, res) => {
     const roomType = await deleteRoomType(req.params.id);
     await logActivity({ action: 'ROOM_TYPE_DELETED', entityType: 'ROOM_TYPE', entityId: roomType.id, performedById: req.user.id, metadata: { name: roomType.name } });
     res.status(204).end();
 }));
 
-router.get('/availability', handle(async (req, res) => {
+router.get('/availability', requireRoomReadAccess, handle(async (req, res) => {
     const { checkIn, checkOut, roomTypeId, capacity } = req.query;
     res.json(
         await findAvailableRooms({
@@ -76,34 +84,34 @@ router.get('/availability', handle(async (req, res) => {
     );
 }));
 
-router.get('/', handle(async (req, res) => {
+router.get('/', requireRoomReadAccess, handle(async (req, res) => {
     const { roomTypeId, status } = req.query;
     res.json(await listRooms({ roomTypeId, status }));
 }));
 
-router.post('/', handle(async (req, res) => {
+router.post('/', requirePermission('MANAGE_ROOMS'), handle(async (req, res) => {
     const room = await createRoom(req.body ?? {});
     await logActivity({ action: 'ROOM_CREATED', entityType: 'ROOM', entityId: room.id, performedById: req.user.id, metadata: { roomNumber: room.roomNumber } });
     res.status(201).json(room);
 }));
 
-router.get('/:id', handle(async (req, res) => {
+router.get('/:id', requireRoomReadAccess, handle(async (req, res) => {
     res.json(await getRoomById(req.params.id));
 }));
 
-router.patch('/:id', handle(async (req, res) => {
+router.patch('/:id', requirePermission('MANAGE_ROOMS'), handle(async (req, res) => {
     const room = await updateRoom(req.params.id, req.body ?? {});
     await logActivity({ action: 'ROOM_UPDATED', entityType: 'ROOM', entityId: room.id, performedById: req.user.id, metadata: { roomNumber: room.roomNumber } });
     res.json(room);
 }));
 
-router.patch('/:id/status', handle(async (req, res) => {
+router.patch('/:id/status', requirePermission('MANAGE_ROOMS'), handle(async (req, res) => {
     const room = await setRoomStatus(req.params.id, req.body?.status);
     await logActivity({ action: 'ROOM_STATUS_UPDATED', entityType: 'ROOM', entityId: room.id, performedById: req.user.id, metadata: { roomNumber: room.roomNumber, status: room.status } });
     res.json(room);
 }));
 
-router.delete('/:id', handle(async (req, res) => {
+router.delete('/:id', requirePermission('MANAGE_ROOMS'), handle(async (req, res) => {
     const room = await deleteRoom(req.params.id);
     await logActivity({ action: 'ROOM_DELETED', entityType: 'ROOM', entityId: room.id, performedById: req.user.id, metadata: { roomNumber: room.roomNumber } });
     res.status(204).end();
